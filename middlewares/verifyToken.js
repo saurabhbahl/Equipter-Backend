@@ -8,7 +8,7 @@ import { JWT_SECRET, TOKEN_ENC_ALGO } from "../useENV.js";
 
 // Middleware to verify JWT token
 export function verifyToken(req, res, next) {
-  console.log("call");
+
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1] 
   // console.log("Cookie", req.cookies.token);
@@ -21,7 +21,7 @@ export function verifyToken(req, res, next) {
 
   try {
     // const tokenWithoutBearer = token.split(" ")[1];
-    console.log("Token received:", token);
+    // console.log("Token received:", token);
 
     // const decryptedTokenBuffer = crypto.privateDecrypt(
     //   {
@@ -38,7 +38,7 @@ export function verifyToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET, {
       algorithms: "HS256",
     });
-    console.log("Decoded Payload:", decoded);
+    // console.log("Decoded Payload:", decoded);
 
     req.user = decoded;
     next();
@@ -50,8 +50,8 @@ export function verifyToken(req, res, next) {
 
 export const checkAdminRole = (req, res, next) => {
   try {
-    console.log("admin");
-    console.log(req.user)
+   
+    
     if (req.user.role != "admin") {
       return res
         .status(401)

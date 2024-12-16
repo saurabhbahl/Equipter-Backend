@@ -1,26 +1,31 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import morgan from "morgan"; 
+import morgan from "morgan";
 import { connection } from "./config/dbConnection.cjs";
 import salesForceRouter from "./routes/salesForce.routes.js";
-import userRouter from "./routes/userRoutes.js";
+import userRouter from "./routes/user.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import { checkAdminRole, verifyToken } from "./middlewares/verifyToken.js";
 import adminRouter from "./routes/admin.routes.js";
+import productRouter from "./routes/product.routes.js";
+import accessoryRouter from "./routes/accessory.routes.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-
-app.use(morgan('combined'));
-
+app.use(morgan("dev"));
 
 // CORS configuration
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL] 
-    : ['http://localhost:5173'];
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [process.env.FRONTEND_URL]
+    : [
+        "http://localhost:4173",
+        "http://localhost:5173",
+        "http://192.168.152.1:5173",
+      ];
 
 app.use(
   cors({
@@ -34,11 +39,13 @@ app.use(express.json());
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
 app.use("/api/v1/user", verifyToken, checkAdminRole, userRouter);
+app.use("/api/v1/product", productRouter);
+app.use("/api/v1/accessory",  accessoryRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
 
-app.get('/api/test', (req, res) => {
-  res.json({ message: '👍✅' });
+app.get("/api/test", (req, res) => {
+  res.json({ message: "👍✅" });
 });
 
 // Invalid route handling
@@ -50,7 +57,10 @@ app.all("/api/*", async (req, res) => {
 app.use((error, req, res, next) => {
   console.log(error);
   const status = error.statusCode || 500;
-  const message = process.env.NODE_ENV === 'production' ? 'Internal Server Error' : error.message;
+  const message =
+    process.env.NODE_ENV === "production"
+      ? "Internal Server Error"
+      : error.message;
   res.status(status).json({ message });
 });
 

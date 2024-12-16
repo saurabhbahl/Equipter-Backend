@@ -1,5 +1,5 @@
 import bcryptjs from "bcryptjs";
-import fs from "fs";
+// import fs from "fs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET, TOKEN_ENC_ALGO } from "../useENV.js";
@@ -38,20 +38,11 @@ export async function generateToken(
     expiresIn: expiry,
   });
   
-  // const encryptedData = crypto.publicEncrypt(
-  //   {
-  //     key: publicKey,
-  //     padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-  //     oaepHash: TOKEN_ENC_ALGO,
-  //   },
-  //   Buffer.from(token)
-  // );
 
-  // console.log("Encrypted Data: ", encryptedData.toString("base64"));
-  // return encryptedData.toString("base64");
   console.timeLog()
   return token
 }
+
 export async function decryptToken(token) {
   console.log("Token",token)
   const decryptedTokenBuffer = crypto.privateDecrypt(
@@ -66,3 +57,15 @@ export async function decryptToken(token) {
   const decryptedToken = decryptedTokenBuffer.toString("utf8");
   return decryptedToken;
 }
+
+  // const encryptedData = crypto.publicEncrypt(
+  //   {
+  //     key: publicKey,
+  //     padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+  //     oaepHash: TOKEN_ENC_ALGO,
+  //   },
+  //   Buffer.from(token)
+  // );
+
+  // console.log("Encrypted Data: ", encryptedData.toString("base64"));
+  // return encryptedData.toString("base64");

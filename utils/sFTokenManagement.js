@@ -1,6 +1,6 @@
 import { SF_ACCESS_TOKEN_URL } from "../useENV.js";
 
-let sfAccessToken = null;
+let sfAccessToken = "00DC0000000Piso!AQEAQMZDQiWn1TACL1E9Cp.O7Asp3DbKyvR5AUnUcaIYtnUsBK3qML1C9xpNrQRbPDXM0dUbQdzdTALuc90LZXenzzWlieQe";
 
 export async function getSFAccessToken() {
   try {
@@ -8,6 +8,7 @@ export async function getSFAccessToken() {
       console.log("Reusing cached Salesforce token");
       return sfAccessToken;
     }
+    return sfAccessToken;
 
     const response = await fetch(SF_ACCESS_TOKEN_URL, {
       method: "POST",

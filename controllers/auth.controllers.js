@@ -206,7 +206,7 @@ export async function forgetPassword(req, res) {
         console.log(err);
         return res.status(500).json({ message: err.message, success: false });
       }else{
-        console.log("call")
+   
          res.status(200).json({ message: "Password reset link sent.", success: true });
       }
      

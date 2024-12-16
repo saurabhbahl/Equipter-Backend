@@ -15,7 +15,7 @@ export const getUsers = async (req, res) => {
 };
 
 export const createUser = async (req, res) => {
-    try {
+  try {
     const response = await dbInstance
       .insert(users)
       .values(req.body)

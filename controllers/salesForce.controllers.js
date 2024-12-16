@@ -16,10 +16,13 @@ export async function sFQuery(req, res) {
         .status(400)
         .json({ success: false, data: [], message: "Invalid query format" });
     }
+    console.log(req.accessToken);
 
-    const sfQueryUrl = `${
-      SF_INSTANCE_URL
-    }/services/data/v52.0/query/?q=${encodeURIComponent(query)}`;
+    // const sfQueryUrl = `https://equipter.my.salesforce.com/services/data/v52.0/query/?q=SELECT+Id,+Name,+CreatedById,+Description__c,+LastModifiedById,+OwnerId,+Price__c,+Quantity__c+FROM+Accessory__c`;
+    const sfQueryUrl = `${SF_INSTANCE_URL}/services/data/v52.0/query/?q=${query}`;
+    // const sfQueryUrl = `${SF_INSTANCE_URL}/services/data/v52.0/query/?q=${encodeURIComponent(
+    //   query
+    // )}`;
     const sfRes = await fetch(sfQueryUrl, {
       method: "GET",
       headers: {
@@ -27,7 +30,7 @@ export async function sFQuery(req, res) {
         "Content-Type": "application/json",
       },
     });
-
+    console.log(sfQueryUrl);
     if (!sfRes.ok) {
       const error = await sfRes.json();
       return res
