@@ -10,6 +10,7 @@ import { checkAdminRole, verifyToken } from "./middlewares/verifyToken.js";
 import adminRouter from "./routes/admin.routes.js";
 import productRouter from "./routes/product.routes.js";
 import accessoryRouter from "./routes/accessory.routes.js";
+import webQuoteRouter from "./routes/webQuote.routes.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +41,7 @@ app.use(express.json());
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
 app.use("/api/v1/user", verifyToken, checkAdminRole, userRouter);
 app.use("/api/v1/product", productRouter);
+app.use("/api/v1/webquote", webQuoteRouter);
 app.use("/api/v1/accessory",  accessoryRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);

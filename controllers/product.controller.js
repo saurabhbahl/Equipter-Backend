@@ -95,7 +95,7 @@ export const removeProduct = async (req, res) => {
       .delete(product)
       .where(eq(product.id, req.params.id))
       .returning();
-    console.log("Prod=>", prod);
+ 
     if (prod.length == 0) {
       return res.json({ success: true, message: "No Product Found" });
     }

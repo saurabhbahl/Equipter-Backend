@@ -29,6 +29,13 @@
       "when": 1733891083418,
       "tag": "0003_added-cascade-in-all-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1736144827322,
+      "tag": "0004_removed-cascading-in-webquote",
+      "breakpoints": true
     }
   ]
 }
