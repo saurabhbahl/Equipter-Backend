@@ -36,6 +36,34 @@
       "when": 1736144827322,
       "tag": "0004_removed-cascading-in-webquote",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1736236074428,
+      "tag": "0005_updated-webQuote",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1736236841172,
+      "tag": "0006_deleted-webquotetable",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1736237104562,
+      "tag": "0007_updated-webquotetable",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1736238296848,
+      "tag": "0008_updated-delivery-state-feild",
+      "breakpoints": true
     }
   ]
 }

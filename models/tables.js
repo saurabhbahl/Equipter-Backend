@@ -113,16 +113,16 @@ export const shippingMethod = pgTable("shipping_method", {
 });
 
 // 9
+
 export const webQuote = pgTable("web_quote", {
   id: uuid("id").primaryKey().defaultRandom(),
-  webquote_url: text("webquote_url").unique().notNull(),
-  stage: stages("stage").notNull(),
-  financing: financing("financing").notNull(),
+  stage: stages("stage").notNull().default("Quote"),
+  financing: text("financing").notNull().default("cash"),
   product_id: uuid("product_id").references(() => product.id),
   product_name: text("product_name").notNull(),
   product_price: numeric("product_price").notNull(),
   product_qty: integer("product_qty").notNull(),
-  shipping_method_id: uuid("shipping_method_id").references(() => shippingMethod.id),
+  shipping_method_used: shippingMethodType("shipping_method_used").default("pickup"),
   zone_id: uuid("zone_id").references(() => zone.id),
   contact_first_name: text("contact_first_name").notNull(),
   contact_last_name: text("contact_last_name").notNull(),
@@ -140,13 +140,9 @@ export const webQuote = pgTable("web_quote", {
   delivery_cost: numeric("delivery_cost"),
   delivery_address_street: text("delivery_address_street"),
   delivery_address_city: text("delivery_address_city"),
-  delivery_address_state_id: uuid("delivery_address_state_id").references(() => state.id),
+  delivery_address_state_id: text("delivery_address_state_id"),
   delivery_address_zip_code: text("delivery_address_zip_code"),
   delivery_address_country: text("delivery_address_country"),
-  estimated_delivery_date: timestamp("estimated_delivery_date"),
-  pickup_location_name: text("pickup_location_name"),
-  pickup_location_address: text("pickup_location_address"),
-  pickup_scheduled_date: timestamp("pickup_scheduled_date"),
   payment_type: text("payment_type"),
   product_total_cost: numeric("product_total_cost"),
   non_refundable_deposit: numeric("non_refundable_deposit"),
@@ -156,6 +152,9 @@ export const webQuote = pgTable("web_quote", {
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
+
+
+
 
 //   10
 
