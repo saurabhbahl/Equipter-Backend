@@ -72,69 +72,29 @@ export class StateService {
     }
   }
 
-
+  // get all states with zone data
   static async getAllStates(req, res) {
     try {
-      // 1. Fetch all states ordered by state_name
-      const states = await dbInstance
-        .select({
-          id: state.id,
-          state_name: state.state_name,
-          is_delivery_paused: state.is_delivery_paused,
-          created_at: state.created_at,
-          updated_at: state.updated_at,
-        })
-        .from(state)
-        .orderBy(state.state_name);
-
-      // 2. Fetch all zoneState and associated zones
-      const zoneStates = await dbInstance
-        .select({
-          state_id: zoneState.state_id,
-          zone_id: zone.id,
-          zone_name: zone.zone_name,
-          shipping_rate: zone.shipping_rate,
-          zone_created_at: zone.created_at,
-          zone_updated_at: zone.updated_at,
-        })
-        .from(zoneState)
-        .innerJoin(zone, eq(zoneState.zone_id, zone.id));
-
-      // 3. Map zones to their respective states
-      const stateMap = states.reduce((acc, curr) => {
-        acc[curr.id] = { ...curr, zone: [] };
-        return acc;
-      }, {});
-
-      zoneStates.forEach((zs) => {
-        if (stateMap[zs.state_id]) {
-          stateMap[zs.state_id].zones.push({
-            id: zs.zone_id,
-            zone_name: zs.zone_name,
-            shipping_rate: zs.shipping_rate,
-            created_at: zs.zone_created_at,
-            updated_at: zs.zone_updated_at,
-          });
-        }
-      });
-
-      // 4. Convert the stateMap back to an array
-      const statesWithZones = Object.values(stateMap);
-
-      // 5. Fetch total count of states
-      const totalCountResult = await dbInstance
-        .select({ count: count() })
-        .from(state)
-    
-
-      const totalCount = totalCountResult?.count || 0;
-
-      // 6. Return the response
+      const statesWithZones=  await dbInstance
+      .select({
+        state_id:zoneState.state_id,
+        zone_id:zoneState.zone_id,
+        zone_name: zone.zone_name,
+        shipping_rate: zone.shipping_rate,
+        created_at: zone.created_at,
+        updated_at: zone.updated_at,
+        state_name: state.state_name,
+        is_delivery_paused:state.is_delivery_paused,
+      })
+      .from(zoneState)
+      .innerJoin(zone, eq(zoneState.zone_id, zone.id))
+      .leftJoin(state, eq(zoneState.state_id, state.id))
+      .orderBy(state.state_name)
+     
       return res.status(200).json({
         success: true,
-        data: statesWithZones,
         length: statesWithZones.length,
-        totalCount,
+        data: statesWithZones,
       });
     } catch (error) {
       console.error("Error in getAllStates:", error);

@@ -70,7 +70,7 @@ export class webQuoteService {
   static async getAllWebQuotesWithRelatedData(req, res) {
     try {
       // Pagination logic
-      const { page = 1, limit = 2 } = req.query;
+      const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
 
       const [webQuoteRes, totalCountRes = 1] = await Promise.all([
