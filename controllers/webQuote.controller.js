@@ -1,10 +1,77 @@
-
-import { count, eq } from "drizzle-orm";
+import { count, eq, and, gte, like, sql } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { quoteAccessory, webQuote } from "../models/tables.js";
 
 export class webQuoteService {
-  
+  static async getAllWebQuotesWithRelatedData(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        stage, 
+        financing, 
+        id,
+        dateFilter, 
+      } = req.query;
+
+      const pageInt = parseInt(page, 10) || 1;
+      const limitInt = parseInt(limit, 10) || 10;
+      const offset = (pageInt - 1) * limitInt;
+
+      const whereClauses = [];
+
+      if (stage) {
+        whereClauses.push(eq(webQuote.stage, stage));
+      }
+     if (id) {
+          whereClauses.push(
+          sql`${webQuote.id}::text ILIKE ${`%${id}%`}`
+        ); 
+      }
+
+     if (financing) {
+        whereClauses.push(eq(webQuote.financing, financing));
+      }     
+      if (dateFilter) {
+        const days = parseInt(dateFilter, 10);
+        console.log(days)
+        if (!isNaN(days) && days > 0) {
+          const dateThreshold = new Date();
+          dateThreshold.setDate(dateThreshold.getDate() - days);
+          console.log(dateThreshold)
+          whereClauses.push(gte(webQuote.created_at, dateThreshold));
+        }
+      }
+      let baseQuery = dbInstance.select().from(webQuote);
+      let countQuery = dbInstance.select({ total: count() }).from(webQuote);
+
+    
+      if (whereClauses.length > 0) {
+        baseQuery = baseQuery.where(and(...whereClauses));
+        countQuery = countQuery.where(and(...whereClauses));
+      }     
+      baseQuery = baseQuery.limit(limitInt).offset(offset);
+
+     const [webQuoteRes, totalCountRes] = await Promise.all([
+        baseQuery,
+        countQuery,
+      ]);
+      const totalCount = totalCountRes?.[0]?.total || 0;
+
+      return res.status(200).json({
+        success: true,
+        length: webQuoteRes.length,
+        totalCount,
+        currentPage: pageInt,
+        totalPages: Math.ceil(totalCount / limitInt),
+        data: webQuoteRes,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
   static async createNewWebQuote(req, res) {
     try {
       // 1) Validate request body
@@ -13,27 +80,29 @@ export class webQuoteService {
           .status(400)
           .json({ success: false, error: "'checkoutForm' is required" });
       }
-  
+
       // 2)  form data
       const formData = { ...req.body.checkoutForm, stage: "Quote" };
-  
+
       // 3) Convert empty string to null
       if (formData.zone_id === "") {
         formData.zone_id = null;
       }
-  
+
       // 4)  accessories array to handle them after quote creation
-      const accessories = Array.isArray(formData.accessories) ? formData.accessories : [];
+      const accessories = Array.isArray(formData.accessories)
+        ? formData.accessories
+        : [];
       // Remove 'accessories' from the main quote insert so it doesn’t break Drizzle's insert
       delete formData.accessories;
-  
+
       // 5) Insert the main web quote
       // `returning()` resolves to an array of inserted rows, so destructure `[createdQuote]`
       const [createdQuote] = await dbInstance
         .insert(webQuote)
         .values(formData)
         .returning();
-  
+
       // 6) If there are accessories,
       let quoteAccessoryRes = [];
       if (accessories.length > 0) {
@@ -51,47 +120,16 @@ export class webQuoteService {
         // Wait for all accessory inserts to complete
         quoteAccessoryRes = await Promise.all(accessoryPromises);
       }
-  
+
       // 7) Return both the main quote and the newly inserted accessories
-      return res
-        .status(201)
-        .json({
-          success: true,
-          message:"WebQuoate created successfully!",
-          data: { webQuote: createdQuote, accessories: quoteAccessoryRes },
-        });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
-  
-
-  static async getAllWebQuotesWithRelatedData(req, res) {
-    try {
-      // Pagination logic
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-
-      const [webQuoteRes, totalCountRes = 1] = await Promise.all([
-        dbInstance.select().from(webQuote).limit(limit).offset(offset),
-        dbInstance.select({ count: count() }).from(webQuote),
-      ]);
-
-      const totalCount = totalCountRes[0].count;
-
-      console.log(webQuoteRes);
-      return res.status(200).json({
+      return res.status(201).json({
         success: true,
-        length: webQuoteRes.length,
-        totalCount: totalCount,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount / limit),
-        data: webQuoteRes,
+        message: "WebQuoate created successfully!",
+        data: { webQuote: createdQuote, accessories: quoteAccessoryRes },
       });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 

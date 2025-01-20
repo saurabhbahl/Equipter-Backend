@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, ilike, like, sql } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { zone, zoneState, state } from "../models/tables.js";
 export class StateService {
@@ -15,7 +15,7 @@ export class StateService {
       const [createdState] = await dbInstance
         .insert(state)
         .values(req.body)
-        .returning(); // returns an array of inserted rows
+        .returning(); 
 
       return res.status(201).json({
         success: true,
@@ -27,85 +27,105 @@ export class StateService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
-  // GET ALL States (with optional pagination)
-  static async getAllStates1(req, res) {
+  // get all states with zone data
+  static async getAllStates(req, res) {
     try {
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
+      const {
+        page = 1,
+        limit = 10,
+        state_name,
+        zone_name,
+        state_id,
+        zone_id,
+        is_delivery_paused,
+      } = req.query;
 
-      const [statesRes, totalCountRes] = await Promise.all([
-        dbInstance.select().from(state).orderBy(state.state_name),
-      await dbInstance
+      const pageInt = parseInt(page, 10) || 1;
+      const limitInt = parseInt(limit, 10) || 10;
+      const offset = (pageInt - 1) * limitInt;
+
+  
+      const whereClauses = [];   
+      if (state_name) {      
+        whereClauses.push(sql`${state.state_name} ILIKE ${'%' + state_name + '%'}`);
+      }   
+      if (zone_name) {
+        whereClauses.push(sql`${zone.zone_name} ILIKE ${'%' + zone_name + '%'}`);
+      }
+
+
+     if (state_id) {
+        whereClauses.push(sql`${state.id}::text ILIKE ${'%' + state_id + '%'}`);
+      }
+
+      if (zone_id) {
+        whereClauses.push(sql`${zone.id}::text ILIKE ${'%' + zone_id + '%'}`);
+      }
+
+      // Boolean filter
+      if (is_delivery_paused == 'true' || is_delivery_paused =='false') {
+        // whereClauses.push(sql`${zone.is_delivery_paused}::E ${'%' + pausedValue + '%'}`);
+        whereClauses.push(eq(state.is_delivery_paused, is_delivery_paused));
+      }
+
+
+      let baseQuery = dbInstance
         .select({
-          id: zone.id,
+          state_id: zoneState.state_id,
+          zone_id: zoneState.zone_id,
           zone_name: zone.zone_name,
           shipping_rate: zone.shipping_rate,
           created_at: zone.created_at,
           updated_at: zone.updated_at,
           state_name: state.state_name,
-          is_delivery_paused:state.is_delivery_paused,
-          stateId:zoneState.state_id,
-          zoneId:zoneState.zone_id
-          
+          is_delivery_paused: state.is_delivery_paused,
         })
-        .from(zone)
-        .innerJoin(zoneState, eq(zoneState.zone_id, zone.id))
-        .rightJoin(state, eq(state.id, stateId))
-        .where(eq(zoneState.state_id, stateId)),
-        dbInstance.select({ count: count() }).from(state),
+        .from(zoneState)
+        .innerJoin(zone, eq(zoneState.zone_id, zone.id))
+        .leftJoin(state, eq(zoneState.state_id, state.id));
+
+   
+      let countQuery = dbInstance
+        .select({
+          total: count(), 
+        })
+        .from(zoneState)
+        .innerJoin(zone, eq(zoneState.zone_id, zone.id))
+        .leftJoin(state, eq(zoneState.state_id, state.id));
+
+
+      if (whereClauses.length > 0) {
+        baseQuery = baseQuery.where(and(...whereClauses));
+        countQuery = countQuery.where(and(...whereClauses));
+      }
+
+      baseQuery = baseQuery.orderBy(state.state_name).limit(limitInt).offset(offset);
+
+
+      const [statesRes, totalCountRes] = await Promise.all([
+        baseQuery,
+        countQuery,
       ]);
 
-      const totalCount = totalCountRes[0].count;
+      // Extract total count
+      const totalCount = totalCountRes?.[0]?.total || 0;
 
       return res.status(200).json({
         success: true,
-        data: statesRes,
         length: statesRes.length,
         totalCount,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount / limit),
+        currentPage: pageInt,
+        totalPages: Math.ceil(totalCount / limitInt),
+        data: statesRes,
       });
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
-  // get all states with zone data
-  static async getAllStates(req, res) {
-    try {
-      const statesWithZones=  await dbInstance
-      .select({
-        state_id:zoneState.state_id,
-        zone_id:zoneState.zone_id,
-        zone_name: zone.zone_name,
-        shipping_rate: zone.shipping_rate,
-        created_at: zone.created_at,
-        updated_at: zone.updated_at,
-        state_name: state.state_name,
-        is_delivery_paused:state.is_delivery_paused,
-      })
-      .from(zoneState)
-      .innerJoin(zone, eq(zoneState.zone_id, zone.id))
-      .leftJoin(state, eq(zoneState.state_id, state.id))
-      .orderBy(state.state_name)
-     
-      return res.status(200).json({
-        success: true,
-        length: statesWithZones.length,
-        data: statesWithZones,
-      });
-    } catch (error) {
-      console.error("Error in getAllStates:", error);
+      console.error('Error in getAllStates:', error);
       return res.status(500).json({
         success: false,
-        error: "Internal Server Error",
+        error: 'Internal Server Error',
       });
     }
-  }
-
-
+  }  
   // GET SINGLE State by ID
   static async getStateById(req, res) {
     try {
@@ -133,7 +153,6 @@ export class StateService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   // UPDATE State
   static async updateStateById(req, res) {
     try {
@@ -166,7 +185,6 @@ export class StateService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   // DELETE State
   static async deleteStateById(req, res) {
     try {
@@ -229,7 +247,7 @@ export class ZoneService {
   }
 
   // GET ALL Zones (with optional pagination)
-  static async getAllZones(req, res) {
+  static async getAllZones1(req, res) {
     try {
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
@@ -243,18 +261,109 @@ export class ZoneService {
 
       return res.status(200).json({
         success: true,
-        data: zonesRes,
         length: zonesRes.length,
         totalCount,
         currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / limit),
+        data: zonesRes,
       });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, error: error.message });
     }
   }
+  static async getAllZones(req, res) {
+    try {
+     
+      const {
+        page = 1,
+        limit = 10,
+        zone_name,
+        zone_id,
+        shipping_rate,
+      } = req.query;
+  
+      const pageInt = parseInt(page, 10) || 1;
+      const limitInt = parseInt(limit, 10) || 10;
+      const offset = (pageInt - 1) * limitInt;
+  
 
+      const whereClauses = [];
+  
+  
+      if (zone_name) {
+        whereClauses.push(sql`${zone.zone_name} ILIKE ${'%' + zone_name + '%'}`);
+      }
+  
+
+      if (zone_id) {
+        whereClauses.push(eq(zone.id, zone_id));
+      }
+  
+ 
+      if (shipping_rate) {
+      
+        const rateNum = Number(shipping_rate);
+        whereClauses.push(eq(zone.shipping_rate, rateNum));
+      }
+
+        let baseQuery = dbInstance
+        .select({
+          id: zone.id,
+          zone_name: zone.zone_name,
+          shipping_rate: zone.shipping_rate,
+          created_at: zone.created_at,
+          updated_at: zone.updated_at,
+          states_count: sql`COUNT(DISTINCT ${zoneState.state_id})`.as('states_count')
+        })
+        .from(zone)
+        .leftJoin(zoneState, eq(zone.id, zoneState.zone_id))
+        .groupBy(zone.id);
+  
+      let countQuery = dbInstance
+        .select({
+          count: sql`COUNT(DISTINCT ${zone.id})`.as('count'),
+        })
+        .from(zone)
+        .leftJoin(zoneState, eq(zone.id, zoneState.zone_id));
+  
+  
+      if (whereClauses.length > 0) {
+        baseQuery = baseQuery.where(and(...whereClauses));
+        countQuery = countQuery.where(and(...whereClauses));
+      }
+  
+
+      baseQuery = baseQuery
+        .orderBy(zone.zone_name)
+        .limit(limitInt)
+        .offset(offset);
+  
+      const [zonesRes, totalCountRes] = await Promise.all([
+        baseQuery,
+        countQuery,
+      ]);
+  
+      const totalCount = totalCountRes?.[0]?.count || 0;
+
+      return res.status(200).json({
+        success: true,
+        length: zonesRes.length,
+        totalCount,
+        currentPage: pageInt,
+        totalPages: Math.ceil(totalCount / limitInt),
+        data: zonesRes,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }}
+  
+  
+  
   // GET SINGLE Zone by ID
   static async getZoneById(req, res) {
     try {
