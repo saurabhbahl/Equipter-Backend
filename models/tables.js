@@ -7,6 +7,7 @@ import {
   paymentStatus,
   installmentStatus,
   developmentStatus,
+  orderStatus,
 } from "./enums.js";
 
 // 1
@@ -80,7 +81,7 @@ export const accessory = pgTable("accessory", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   7
+//7
 export const accessoryImage = pgTable("accessory_image", {
   id: uuid("id").primaryKey().defaultRandom(),
   accessory_id: uuid("accessory_id").references(() => accessory.id,{onDelete:"cascade"}),
@@ -91,7 +92,7 @@ export const accessoryImage = pgTable("accessory_image", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-// 18
+//18
 export const accessoryProduct = pgTable("accessory_product", {
   id: uuid("id").primaryKey().defaultRandom(),
   accessory_id: uuid("accessory_id").references(() => accessory.id,{onDelete:"cascade"}),
@@ -100,9 +101,7 @@ export const accessoryProduct = pgTable("accessory_product", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-
-
-// 8
+//8
 export const shippingMethod = pgTable("shipping_method", {
   id: uuid("id").primaryKey().defaultRandom(),
   method_type: shippingMethodType("method_type").notNull(),
@@ -112,18 +111,18 @@ export const shippingMethod = pgTable("shipping_method", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-// 9
+//9
+
 export const webQuote = pgTable("web_quote", {
   id: uuid("id").primaryKey().defaultRandom(),
-  webquote_url: text("webquote_url").unique().notNull(),
-  stage: stages("stage").notNull(),
-  financing: financing("financing").notNull(),
-  product_id: uuid("product_id").references(() => product.id,{onDelete:"cascade"}),
+  stage: stages("stage").notNull().default("Quote"),
+  financing: text("financing").notNull().default("cash"),
+  product_id: uuid("product_id").references(() => product.id),
   product_name: text("product_name").notNull(),
   product_price: numeric("product_price").notNull(),
   product_qty: integer("product_qty").notNull(),
-  shipping_method_id: uuid("shipping_method_id").references(() => shippingMethod.id,{onDelete:"cascade"}),
-  zone_id: uuid("zone_id").references(() => zone.id,{onDelete:"cascade"}),
+  shipping_method_used: shippingMethodType("shipping_method_used").default("pickup"),
+  zone_id: uuid("zone_id").references(() => zone.id),
   contact_first_name: text("contact_first_name").notNull(),
   contact_last_name: text("contact_last_name").notNull(),
   contact_company_name: text("contact_company_name"),
@@ -140,13 +139,9 @@ export const webQuote = pgTable("web_quote", {
   delivery_cost: numeric("delivery_cost"),
   delivery_address_street: text("delivery_address_street"),
   delivery_address_city: text("delivery_address_city"),
-  delivery_address_state_id: uuid("delivery_address_state_id").references(() => state.id,{onDelete:"cascade"}),
+  delivery_address_state_id: text("delivery_address_state_id"),
   delivery_address_zip_code: text("delivery_address_zip_code"),
   delivery_address_country: text("delivery_address_country"),
-  estimated_delivery_date: timestamp("estimated_delivery_date"),
-  pickup_location_name: text("pickup_location_name"),
-  pickup_location_address: text("pickup_location_address"),
-  pickup_scheduled_date: timestamp("pickup_scheduled_date"),
   payment_type: text("payment_type"),
   product_total_cost: numeric("product_total_cost"),
   non_refundable_deposit: numeric("non_refundable_deposit"),
@@ -157,8 +152,8 @@ export const webQuote = pgTable("web_quote", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   10
 
+//10
 export const quoteAccessory = pgTable("quote_accessory", {
   id: uuid("id").primaryKey().defaultRandom(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"cascade"}),
@@ -171,7 +166,7 @@ export const quoteAccessory = pgTable("quote_accessory", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   11
+//11
 export const fullPayment = pgTable("full_payment", {
   id: uuid("id").primaryKey().defaultRandom(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"cascade"}),
@@ -186,10 +181,6 @@ export const fullPayment = pgTable("full_payment", {
   uniqueWebQuotePaymentConstraint: uniqueIndex("unique_webquote_fullpayment").on(fullPayment.webquote_id),
 }));
 
-
-
-
-
 // 12
 export const financingRateConfig = pgTable("financing_rate_config", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -197,6 +188,7 @@ export const financingRateConfig = pgTable("financing_rate_config", {
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
+
 // 13
 export const emiPlan = pgTable("emi_plan", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -214,10 +206,7 @@ export const emiPlan = pgTable("emi_plan", {
 }));
 
 
-
-
-
-//   14
+//14
 export const installmentsTracking = pgTable("installments_tracking", {
   id: uuid("id").primaryKey().defaultRandom(),
   emi_plan_id: uuid("emi_plan_id").references(() => emiPlan.id,{onDelete:"cascade"}),
@@ -230,7 +219,7 @@ export const installmentsTracking = pgTable("installments_tracking", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   15
+//15
 export const emiTransaction = pgTable("emi_transaction", {
   id: uuid("id").primaryKey().defaultRandom(),
   installment_tracking_id: uuid("installment_tracking_id").references(
@@ -244,18 +233,19 @@ export const emiTransaction = pgTable("emi_transaction", {
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
-// 16
+
+//16
 export const order = pgTable("order", {
   id: uuid("id").primaryKey().defaultRandom(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"cascade"}),
-  order_status: developmentStatus("order_status").notNull(),
+  order_status: orderStatus("order_status").notNull(),
   estimated_completion_date: timestamp("estimated_completion_date").notNull(),
   actual_completion_date: timestamp("actual_completion_date"),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   17
+//17
 export const developmentStage = pgTable("development_stage", {
   id: uuid("id").primaryKey().defaultRandom(),
   product_order_id: uuid("product_order_id").references(() => order.id,{onDelete:"cascade"}),

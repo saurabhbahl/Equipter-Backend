@@ -1,4 +1,10 @@
 DO $$ BEGIN
+ CREATE TYPE "public"."role" AS ENUM('admin', 'user');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
  CREATE TYPE "public"."developmentstatus" AS ENUM('Pending', 'InProgress', 'Completed', 'Delayed');
 EXCEPTION
  WHEN duplicate_object THEN null;
@@ -12,6 +18,12 @@ END $$;
 --> statement-breakpoint
 DO $$ BEGIN
  CREATE TYPE "public"."installmentstatus" AS ENUM('Pending', 'Paid', 'Overdue');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."orderStatus" AS ENUM('Pending', 'Approved', 'Delivered', 'Shipped', 'Cancelled');
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
@@ -39,6 +51,15 @@ DO $$ BEGIN
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "users" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" varchar(255) NOT NULL,
+	"password" varchar(255) NOT NULL,
+	"role" "role" DEFAULT 'user' NOT NULL,
+	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "accessory" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -144,7 +165,7 @@ CREATE TABLE IF NOT EXISTS "installments_tracking" (
 CREATE TABLE IF NOT EXISTS "order" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"webquote_id" uuid,
-	"order_status" "developmentstatus" NOT NULL,
+	"order_status" "orderStatus" NOT NULL,
 	"estimated_completion_date" timestamp NOT NULL,
 	"actual_completion_date" timestamp,
 	"created_at" timestamp DEFAULT now(),
@@ -210,14 +231,13 @@ CREATE TABLE IF NOT EXISTS "state" (
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "web_quote" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"webquote_url" text NOT NULL,
-	"stage" "stages" NOT NULL,
-	"financing" "financing" NOT NULL,
+	"stage" "stages" DEFAULT 'Quote' NOT NULL,
+	"financing" text DEFAULT 'cash' NOT NULL,
 	"product_id" uuid,
 	"product_name" text NOT NULL,
 	"product_price" numeric NOT NULL,
 	"product_qty" integer NOT NULL,
-	"shipping_method_id" uuid,
+	"shipping_method_used" "shippingmethodtype" DEFAULT 'pickup',
 	"zone_id" uuid,
 	"contact_first_name" text NOT NULL,
 	"contact_last_name" text NOT NULL,
@@ -235,20 +255,15 @@ CREATE TABLE IF NOT EXISTS "web_quote" (
 	"delivery_cost" numeric,
 	"delivery_address_street" text,
 	"delivery_address_city" text,
-	"delivery_address_state_id" uuid,
+	"delivery_address_state_id" text,
 	"delivery_address_zip_code" text,
 	"delivery_address_country" text,
-	"estimated_delivery_date" timestamp,
-	"pickup_location_name" text,
-	"pickup_location_address" text,
-	"pickup_scheduled_date" timestamp,
 	"payment_type" text,
 	"product_total_cost" numeric,
 	"non_refundable_deposit" numeric,
 	"i_understand_deposit_is_non_refundable" boolean,
 	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "web_quote_webquote_url_unique" UNIQUE("webquote_url")
+	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "zone" (
@@ -268,79 +283,79 @@ CREATE TABLE IF NOT EXISTS "zone_state" (
 );
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "accessory_image" ADD CONSTRAINT "accessory_image_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "accessory_image" ADD CONSTRAINT "accessory_image_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "accessory_product" ADD CONSTRAINT "accessory_product_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "accessory_product" ADD CONSTRAINT "accessory_product_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "accessory_product" ADD CONSTRAINT "accessory_product_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "accessory_product" ADD CONSTRAINT "accessory_product_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "development_stage" ADD CONSTRAINT "development_stage_product_order_id_order_id_fk" FOREIGN KEY ("product_order_id") REFERENCES "public"."order"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "development_stage" ADD CONSTRAINT "development_stage_product_order_id_order_id_fk" FOREIGN KEY ("product_order_id") REFERENCES "public"."order"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "emi_plan" ADD CONSTRAINT "emi_plan_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "emi_plan" ADD CONSTRAINT "emi_plan_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "emi_plan" ADD CONSTRAINT "emi_plan_financing_rate_config_id_financing_rate_config_id_fk" FOREIGN KEY ("financing_rate_config_id") REFERENCES "public"."financing_rate_config"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "emi_plan" ADD CONSTRAINT "emi_plan_financing_rate_config_id_financing_rate_config_id_fk" FOREIGN KEY ("financing_rate_config_id") REFERENCES "public"."financing_rate_config"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "emi_transaction" ADD CONSTRAINT "emi_transaction_installment_tracking_id_installments_tracking_id_fk" FOREIGN KEY ("installment_tracking_id") REFERENCES "public"."installments_tracking"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "emi_transaction" ADD CONSTRAINT "emi_transaction_installment_tracking_id_installments_tracking_id_fk" FOREIGN KEY ("installment_tracking_id") REFERENCES "public"."installments_tracking"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "full_payment" ADD CONSTRAINT "full_payment_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "full_payment" ADD CONSTRAINT "full_payment_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "installments_tracking" ADD CONSTRAINT "installments_tracking_emi_plan_id_emi_plan_id_fk" FOREIGN KEY ("emi_plan_id") REFERENCES "public"."emi_plan"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "installments_tracking" ADD CONSTRAINT "installments_tracking_emi_plan_id_emi_plan_id_fk" FOREIGN KEY ("emi_plan_id") REFERENCES "public"."emi_plan"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "order" ADD CONSTRAINT "order_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "order" ADD CONSTRAINT "order_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "product_image" ADD CONSTRAINT "product_image_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "product_image" ADD CONSTRAINT "product_image_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "quote_accessory" ADD CONSTRAINT "quote_accessory_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "quote_accessory" ADD CONSTRAINT "quote_accessory_webquote_id_web_quote_id_fk" FOREIGN KEY ("webquote_id") REFERENCES "public"."web_quote"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "quote_accessory" ADD CONSTRAINT "quote_accessory_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "quote_accessory" ADD CONSTRAINT "quote_accessory_accessory_id_accessory_id_fk" FOREIGN KEY ("accessory_id") REFERENCES "public"."accessory"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
@@ -352,34 +367,23 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "web_quote" ADD CONSTRAINT "web_quote_shipping_method_id_shipping_method_id_fk" FOREIGN KEY ("shipping_method_id") REFERENCES "public"."shipping_method"("id") ON DELETE no action ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
-DO $$ BEGIN
  ALTER TABLE "web_quote" ADD CONSTRAINT "web_quote_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE no action ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "web_quote" ADD CONSTRAINT "web_quote_delivery_address_state_id_state_id_fk" FOREIGN KEY ("delivery_address_state_id") REFERENCES "public"."state"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "zone_state" ADD CONSTRAINT "zone_state_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "zone_state" ADD CONSTRAINT "zone_state_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "zone_state" ADD CONSTRAINT "zone_state_state_id_state_id_fk" FOREIGN KEY ("state_id") REFERENCES "public"."state"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "zone_state" ADD CONSTRAINT "zone_state_state_id_state_id_fk" FOREIGN KEY ("state_id") REFERENCES "public"."state"("id") ON DELETE no action ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "unique_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "unique_webquote_emiplan" ON "emi_plan" USING btree ("webquote_id");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "unique_webquote_fullpayment" ON "full_payment" USING btree ("webquote_id");

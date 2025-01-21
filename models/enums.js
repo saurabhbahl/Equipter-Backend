@@ -7,3 +7,4 @@ export const paymentMethod = pgEnum("paymentmethod", ["card"]);
 export const paymentStatus = pgEnum("paymentstatus", ["Pending", "Completed", "Failed", "Refunded"]);
 export const installmentStatus = pgEnum("installmentstatus", ["Pending", "Paid", "Overdue"]);
 export const developmentStatus = pgEnum("developmentstatus", ["Pending", "InProgress", "Completed", "Delayed"]);
+export const orderStatus = pgEnum("orderStatus", ["Pending", "Approved", "Delivered", "Shipped", "Cancelled"]);

@@ -11,10 +11,11 @@ export async function orderSeeder() {
   const orders = Array.from({ length: 3 }, () => ({
     webquote_id: faker.helpers.arrayElement(webQuoteIds).id,
     order_status: faker.helpers.arrayElement([
+      "Approved",
       "Pending",
-      "InProgress",
-      "Completed",
-      "Delayed",
+      "Shipped",
+      "Delivered",
+      "Cancelled",
     ]),
     estimated_completion_date: faker.date.future(),
     actual_completion_date: faker.datatype.boolean() ? faker.date.future() : null,
@@ -29,3 +30,6 @@ export async function orderSeeder() {
     console.error("Error seeding Orders:", error);
   }
 }
+
+
+orderSeeder();

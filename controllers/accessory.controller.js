@@ -110,7 +110,6 @@ export const fetchAccessoryByIdWithImages = async (req, res) => {
 };
 
 // accessory product apis
-
 export const getAllAccessoryProducts = async (req, res) => {
   try {
     const relationships = await dbInstance.select().from(accessoryProduct);
@@ -119,6 +118,7 @@ export const getAllAccessoryProducts = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
 export const createAccessoryProduct = async (req, res) => {
   try {
     const newRelationship = await dbInstance
@@ -155,7 +155,6 @@ export const removeAccessoryProduct = async (req, res) => {
 };
 
 // accessory images apis
-
 export const getAllAccessoryImages = async (req, res) => {
   try {
     const images = await dbInstance.select().from(accessoryImage);
@@ -217,10 +216,6 @@ export const deleteAccessoryImage = async (req, res) => {
 };
 
 // slug
-
-
-
-
 export const isSlugUnique = async (req, res) => {
   try {
     const { id, slug } = req.query;
@@ -286,11 +281,6 @@ export const isSlugUnique = async (req, res) => {
       .json({ success: false, error: "An unexpected error occurred." });  
   }
 };
-
-
-
-
-
 
 export const ensureFeaturedImage = async (req, res) => {
   try {
