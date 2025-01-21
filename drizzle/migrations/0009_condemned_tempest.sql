@@ -1,0 +1,1 @@
+ALTER TABLE "web_quote" ADD COLUMN "test_field" text;

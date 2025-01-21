@@ -1,0 +1,1 @@
+ALTER TABLE "web_quote" DROP COLUMN IF EXISTS "test_field";

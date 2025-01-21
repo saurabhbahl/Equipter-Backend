@@ -14,7 +14,7 @@
     "db:rollback": "node utils/autoRollback.js",
     "db:reset": "npx drizzle-kit migrate:reset",
     "studio": " npx drizzle-kit studio",
-    "db:seed": "node ./seeders/webQuoteSeeder.js"
+    "db:seed": "node ./seeders/seed.js"
   },
   "keywords": [],
   "author": "",

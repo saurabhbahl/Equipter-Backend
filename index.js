@@ -96,23 +96,23 @@ const customRateLimitHandler = (req, res /*next*/) => {
     message: "Too many requests, please try again after 15 minutes.",
   });
 };
-app.use((req, res, next) => {
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  console.log(`IP address of incoming request: ${ip}`);
-  next();
-});
+// app.use((req, res, next) => {
+//   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+//   console.log(`IP address of incoming request: ${ip}`);
+//   next();
+// });
 
 
-// Middleware function to log IP address
-app.use((req, res, next) => {
-  let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  if (ip.startsWith("::ffff:")) {
-    ip = ip.replace("::ffff:", "");
-  }
+// // Middleware function to log IP address
+// app.use((req, res, next) => {
+//   let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+//   if (ip.startsWith("::ffff:")) {
+//     ip = ip.replace("::ffff:", "");
+//   }
   
-  console.log(`IP address of incoming request: ${ip}`);
-  next();
-});
+//   console.log(`IP address of incoming request: ${ip}`);
+//   next();
+// });
 
   
   

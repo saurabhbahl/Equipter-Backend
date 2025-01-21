@@ -123,7 +123,7 @@ export const webQuote = pgTable("web_quote", {
   product_price: numeric("product_price").notNull(),
   product_qty: integer("product_qty").notNull(),
   shipping_method_used: shippingMethodType("shipping_method_used").default("pickup"),
-  zone_id: uuid("zone_id").references(() => zone.id),
+  zone_id: uuid("zone_id").references(() => zone.id,{onDelete:"set null"}),
   contact_first_name: text("contact_first_name").notNull(),
   contact_last_name: text("contact_last_name").notNull(),
   contact_company_name: text("contact_company_name"),
@@ -199,7 +199,7 @@ export const financingRateConfig = pgTable("financing_rate_config", {
 // 13
 export const emiPlan = pgTable("emi_plan", {
   id: uuid("id").primaryKey().defaultRandom(),
-  webquote_id: uuid("webquote_id").references(() => webQuote.id),
+  webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"set null",onUpdate:"set null"}),
   financing_rate_config_id: uuid("financing_rate_config_id").references(() => financingRateConfig.id),
   total_financed_amount: numeric("total_financed_amount").notNull(),
   monthly_emi_amount: numeric("monthly_emi_amount").notNull(),
@@ -246,7 +246,7 @@ export const emiTransaction = pgTable("emi_transaction", {
 // 16
 export const order = pgTable("order", {
   id: uuid("id").primaryKey().defaultRandom(),
-  webquote_id: uuid("webquote_id").references(() => webQuote.id),
+  webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"set null",onUpdate:"set null"}),
   order_status: developmentStatus("order_status").notNull(),
   estimated_completion_date: timestamp("estimated_completion_date").notNull(),
   actual_completion_date: timestamp("actual_completion_date"),
