@@ -1,45 +1,114 @@
 import { connection } from "../config/dbConnection.cjs";
+import { and, count, desc, eq, gte, ilike, like, sql } from "drizzle-orm";
+import { dbInstance } from "../config/dbConnection.cjs";
+import { order, webQuote, product } from "../models/tables.js";
 
-// Fetch all orders with their associated web_quote and related product using raw SQL query
-export const fetchAllOrders = async (req, res) => {
-  try {
-    // Perform a raw SQL query fetching necessary columns
-    const result = await connection.query(`
-      SELECT o.*, wq.product_name AS webquote_product_name, p.name AS product_name, p.product_url AS product_url
-      FROM "order" AS o
-      INNER JOIN "web_quote" AS wq ON o.webquote_id = wq.id
-      INNER JOIN "product" AS p ON wq.product_id = p.id
-    `);
+export class OrderService {
+  static async fetchAllOrders(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        order_status,
+        product_name,
+        duration,
+        order_id
+      } = req.query;
 
-    // Restructure the data to include the nested web_quote and related product
-    const ordersWithWebQuoteAndProduct = result.rows.map(row => {
-      return {
-        // Order fields
-        id: row.id,
-        webquote_id: row.webquote_id,
-        order_status: row.order_status,
-        estimated_completion_date: row.estimated_completion_date,
-        actual_completion_date: row.actual_completion_date,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+      const pageInt = parseInt(page, 10) || 1;
+      const limitInt = parseInt(limit, 10) || 10;
+      const offset = (pageInt - 1) * limitInt;
 
-        // Nested web_quote with only product_name
-        webquote: {
-          product_name: row.webquote_product_name // Only include product_name
-        },
+  
+      const whereClauses = [];    
+      if (order_status) {
+        whereClauses.push(eq(order.order_status, order_status));
+      }
+      if (order_id) {
+        whereClauses.push(
+          sql`${order.id}::text ILIKE ${`%${order_id}%`}`
+        ); 
+      }
 
-        // Related product details
-        product: {
-          name: row.product_name,
-          product_url: row.product_url,
+      if (product_name) {
+        whereClauses.push(ilike(product.name, `%${product_name}%`));
+      }
+      
+      if (duration) {
+        const days = parseInt(duration, 10);
+        console.log(days)
+        if (!isNaN(days) && days > 0) {
+          const dateThreshold = new Date();
+          dateThreshold.setDate(dateThreshold.getDate() - days);
+          console.log(dateThreshold)
+          whereClauses.push(gte(order.created_at, dateThreshold));
         }
-      };
-    });
+      }
 
-    // Send the response with the transformed data
-    res.json({ success: true, data: ordersWithWebQuoteAndProduct });
+      // --- Base SELECT Query ---
+      let baseQuery = dbInstance
+        .select({
+          id: order.id,
+          webquote_id: order.webquote_id,
+          order_status: order.order_status,
+          estimated_completion_date: order.estimated_completion_date,
+          actual_completion_date: order.actual_completion_date,
+          created_at: order.created_at,
+          updated_at: order.updated_at,
+          // WebQuote columns         
+          webquote: {
+            product_name: webQuote.product_name,
+          },
+          //product columns
+          product: {
+            name: product.name,
+            product_url: product.product_url,
+          },      
+        })
+        .from(order)
+        .innerJoin(webQuote, eq(order.webquote_id, webQuote.id))
+        .innerJoin(product, eq(webQuote.product_id, product.id));
 
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+
+      let countQuery = dbInstance
+        .select({
+          total: count(), 
+        })
+        .from(order)
+        .innerJoin(webQuote, eq(order.webquote_id, webQuote.id))
+        .innerJoin(product, eq(webQuote.product_id, product.id));
+
+
+      if (whereClauses.length > 0) {
+        baseQuery = baseQuery.where(and(...whereClauses));
+        countQuery = countQuery.where(and(...whereClauses));
+      }
+
+      // --- Add ORDER BY, LIMIT, OFFSET to the main query ---
+      baseQuery = baseQuery.orderBy(desc(order.created_at)).limit(limitInt).offset(offset);
+
+      // --- Execute both queries in parallel ---
+      const [orderRes, totalCountResult] = await Promise.all([baseQuery, countQuery]);
+
+      // Extract total count from the count query
+      const totalCount = totalCountResult[0]?.total ?? 0;
+      const totalPages = Math.ceil(totalCount / limitInt);
+
+
+      return res.status(200).json({
+        success: true,
+        length: orderRes.length,
+        totalCount,
+        currentPage: pageInt,
+        totalPages,
+        data: orderRes,
+      });
+    } catch (error) {
+      console.error("Error in fetchAllOrders:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+      });
+    }
   }
-};
+}

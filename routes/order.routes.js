@@ -1,8 +1,8 @@
 import express from "express";
-import { fetchAllOrders } from "../controllers/order.controller.js";
+import { OrderService } from "../controllers/order.controller.js";
 
 const orderRouter = express.Router();
 
-orderRouter.get("/", fetchAllOrders);
+orderRouter.get("/", OrderService.fetchAllOrders);
 
 export default orderRouter;

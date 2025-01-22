@@ -38,7 +38,6 @@ export class webQuoteService {
         if (!isNaN(days) && days > 0) {
           const dateThreshold = new Date();
           dateThreshold.setDate(dateThreshold.getDate() - days);
-          console.log(dateThreshold)
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }

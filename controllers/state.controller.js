@@ -1,32 +1,7 @@
 import { and, count, eq, ilike, like, sql } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { zone, zoneState, state } from "../models/tables.js";
-export class StateService {
-  // CREATE a new State
-  static async createState(req, res) {
-    try {
-      if (!req.body || !req.body.state_name) {
-        return res.status(400).json({
-          success: false,
-          error: "'state_name' is required",
-        });
-      }
-
-      const [createdState] = await dbInstance
-        .insert(state)
-        .values(req.body)
-        .returning(); 
-
-      return res.status(201).json({
-        success: true,
-        data: createdState,
-        message: "State created successfully!",
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
+export class StateService { 
   // get all states with zone data
   static async getAllStates(req, res) {
     try {
@@ -126,6 +101,32 @@ export class StateService {
       });
     }
   }  
+  // CREATE a new State
+  static async createState(req, res) {
+    try {
+      if (!req.body || !req.body.state_name) {
+        return res.status(400).json({
+          success: false,
+          error: "'state_name' is required",
+        });
+      }
+
+      const [createdState] = await dbInstance
+        .insert(state)
+        .values(req.body)
+        .returning(); 
+
+      return res.status(201).json({
+        success: true,
+        data: createdState,
+        message: "State created successfully!",
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+ 
   // GET SINGLE State by ID
   static async getStateById(req, res) {
     try {
@@ -246,32 +247,7 @@ export class ZoneService {
     }
   }
 
-  // GET ALL Zones (with optional pagination)
-  static async getAllZones1(req, res) {
-    try {
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-
-      const [zonesRes, totalCountRes] = await Promise.all([
-        dbInstance.select().from(zone).limit(limit).offset(offset),
-        dbInstance.select({ count: count() }).from(zone),
-      ]);
-
-      const totalCount = totalCountRes[0].count;
-
-      return res.status(200).json({
-        success: true,
-        length: zonesRes.length,
-        totalCount,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount / limit),
-        data: zonesRes,
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
+ 
   static async getAllZones(req, res) {
     try {
      
