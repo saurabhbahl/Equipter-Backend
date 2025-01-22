@@ -7,6 +7,7 @@ import {
   paymentStatus,
   installmentStatus,
   developmentStatus,
+  orderStatus,
 } from "./enums.js";
 
 // 1
@@ -80,7 +81,7 @@ export const accessory = pgTable("accessory", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   7
+//7
 export const accessoryImage = pgTable("accessory_image", {
   id: uuid("id").primaryKey().defaultRandom(),
   accessory_id: uuid("accessory_id").references(() => accessory.id,{onDelete:"cascade"}),
@@ -91,7 +92,7 @@ export const accessoryImage = pgTable("accessory_image", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-// 18
+//18
 export const accessoryProduct = pgTable("accessory_product", {
   id: uuid("id").primaryKey().defaultRandom(),
   accessory_id: uuid("accessory_id").references(() => accessory.id,{onDelete:"cascade"}),
@@ -100,9 +101,7 @@ export const accessoryProduct = pgTable("accessory_product", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-
-
-// 8
+//8
 export const shippingMethod = pgTable("shipping_method", {
   id: uuid("id").primaryKey().defaultRandom(),
   method_type: shippingMethodType("method_type").notNull(),
@@ -113,7 +112,6 @@ export const shippingMethod = pgTable("shipping_method", {
 });
 
 // 9
-
 export const webQuote = pgTable("web_quote", {
   id: uuid("id").primaryKey().defaultRandom(),
   stage: stages("stage").notNull().default("Quote"),
@@ -153,9 +151,6 @@ export const webQuote = pgTable("web_quote", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-
-
-
 //   10
 
 export const quoteAccessory = pgTable("quote_accessory", {
@@ -170,7 +165,7 @@ export const quoteAccessory = pgTable("quote_accessory", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   11
+//11
 export const fullPayment = pgTable("full_payment", {
   id: uuid("id").primaryKey().defaultRandom(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id),
@@ -185,10 +180,6 @@ export const fullPayment = pgTable("full_payment", {
   uniqueWebQuotePaymentConstraint: uniqueIndex("unique_webquote_fullpayment").on(fullPayment.webquote_id),
 }));
 
-
-
-
-
 // 12
 export const financingRateConfig = pgTable("financing_rate_config", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -196,6 +187,7 @@ export const financingRateConfig = pgTable("financing_rate_config", {
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
+
 // 13
 export const emiPlan = pgTable("emi_plan", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -213,10 +205,7 @@ export const emiPlan = pgTable("emi_plan", {
 }));
 
 
-
-
-
-//   14
+//14
 export const installmentsTracking = pgTable("installments_tracking", {
   id: uuid("id").primaryKey().defaultRandom(),
   emi_plan_id: uuid("emi_plan_id").references(() => emiPlan.id),
@@ -229,7 +218,7 @@ export const installmentsTracking = pgTable("installments_tracking", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   15
+//15
 export const emiTransaction = pgTable("emi_transaction", {
   id: uuid("id").primaryKey().defaultRandom(),
   installment_tracking_id: uuid("installment_tracking_id").references(
@@ -243,18 +232,19 @@ export const emiTransaction = pgTable("emi_transaction", {
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
-// 16
+
+//16
 export const order = pgTable("order", {
   id: uuid("id").primaryKey().defaultRandom(),
+  order_status: orderStatus("order_status").notNull(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"set null",onUpdate:"set null"}),
-  order_status: developmentStatus("order_status").notNull(),
   estimated_completion_date: timestamp("estimated_completion_date").notNull(),
   actual_completion_date: timestamp("actual_completion_date"),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-//   17
+//17
 export const developmentStage = pgTable("development_stage", {
   id: uuid("id").primaryKey().defaultRandom(),
   product_order_id: uuid("product_order_id").references(() => order.id,),

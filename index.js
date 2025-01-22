@@ -17,6 +17,7 @@ import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import productRouter from "./routes/product.routes.js";
 import accessoryRouter from "./routes/accessory.routes.js";
+import orderRouter from "./routes/order.routes.js";
 import webQuoteRouter from "./routes/webQuote.routes.js";
 import stateRouter from "./routes/state.routes.js";
 
@@ -124,6 +125,8 @@ app.use(express.urlencoded({ limit: "10kb", extended: true }));
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
 app.use("/api/v1/user", verifyToken, checkAdminRole, userRouter);
 app.use("/api/v1/product", productRouter);
+app.use("/api/v1/accessory",  accessoryRouter);
+app.use("/api/v1/order", verifyToken,checkAdminRole,  orderRouter);
 app.use("/api/v1/state", stateRouter);
 app.use("/api/v1/webquote", webQuoteRouter);
 app.use("/api/v1/accessory", accessoryRouter);
