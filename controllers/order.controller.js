@@ -58,11 +58,16 @@ export class OrderService {
           // WebQuote columns         
           webquote: {
             product_name: webQuote.product_name,
+            state_id:webQuote.delivery_address_state_id,         
           },
           //product columns
           product: {
+            product_id:product.id,
             name: product.name,
             product_url: product.product_url,
+            product_price:product.price,
+            product_qty:webQuote.product_qty,
+            product_total_cost:webQuote.product_total_cost
           },      
         })
         .from(order)

@@ -36,6 +36,7 @@ const allowedOrigins =
         "http://localhost:4173",
         "http://localhost:5173",
         "http://192.168.152.1:5173",
+        ""
       ];
 app.use(
   cors({
@@ -118,8 +119,8 @@ const customRateLimitHandler = (req, res /*next*/) => {
   
   
 // // Body parsing with size limits
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ limit: "10kb", extended: true }));
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ limit: "100kb", extended: true }));
 
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);

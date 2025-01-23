@@ -118,14 +118,7 @@ export async function loginUser(req, res) {
       name: userExists[0]?.name,
       role: userExists[0]?.role,
     };
-    console.log("User data", userData);
     const token = await generateToken(userData);
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   secure: false,
-    //   expires: new Date(Date.now() + 60 * 60 * 1000),
-    //   sameSite: "Strict",
-    // });
     return res.status(200).json({ success: true, token, userData });
   } catch (error) {
     console.log(error);
