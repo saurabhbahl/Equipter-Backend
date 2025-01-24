@@ -44,7 +44,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-console.log(allowedOrigins)
+// app.use(helmet())
 // Helmet configuration
 app.use(
   helmet({
@@ -92,45 +92,17 @@ app.use((req, res, next) => {
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
 
-
-// Middleware function to log IP address
 app.use((req, res, next) => {
-  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  if (ip.startsWith("::ffff:")) {
-    ip = ip.replace("::ffff:", "");
-  }  
+  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
   console.log(`IP address of incoming request: ${ip}`);
   next();
 });
+
   
   
 // // Body parsing with size limits
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
-
-
-
-
-
-// const matchUrl = (url, allowedOrigins) => {
-//   if (!url) return false;
-//   return allowedOrigins.some((origin) => new RegExp(`^${origin.replace(/\/$/, '')}`).test(url));
-// };
-
-// app.use((req, res, next) => {
-//   const origin = req.headers.origin;
-//   const referrer = req.headers.referer;
-//   const originMatches = matchUrl(origin, allowedOrigins);
-//   const referrerMatches = matchUrl(referrer, allowedOrigins);  
-//   console.log(originMatches, referrerMatches);
-//   if (originMatches || referrerMatches) {
-//     console.log(`Request from ${origin} -> ${referrer} allowed`);
-//     next();
-//   } else {
-//     console.log(`Request from ${origin} -> ${referrer} rejected`);
-//     res.status(403).json({ success: false, message: "Access denied" });
-//   }
-// });
 
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
