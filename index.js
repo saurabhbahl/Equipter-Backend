@@ -27,7 +27,7 @@ const app = express();
 
 // Logging
 app.use(morgan("combined"));
-
+console.log(process.env.NODE_ENV,process.env.FRONTEND_URL)
 // CORS configuration
 const allowedOrigins =
   process.env.NODE_ENV === "production"
@@ -36,7 +36,6 @@ const allowedOrigins =
         "http://localhost:4173",
         "http://localhost:5173",
         "http://192.168.152.1:5173",
-        ""
       ];
 app.use(
   cors({
@@ -45,7 +44,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-// app.use(helmet())
+
 // Helmet configuration
 app.use(
   helmet({
@@ -85,42 +84,46 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+// Prevent HTTP Parameter Pollution
+app.use(hpp());
+
+
+// Middleware function to log IP address
 app.use((req, res, next) => {
-  console.log("Request coming from IP:", req.ip);
+  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.replace("::ffff:", "");
+  }
+  
+  console.log(`IP address of incoming request: ${ip}`);
   next();
 });
 
-// Prevent HTTP Parameter Pollution
-app.use(hpp());
-const customRateLimitHandler = (req, res /*next*/) => {
-  res.status(429).json({
-    success: false,
-    message: "Too many requests, please try again after 15 minutes.",
-  });
+const matchUrl = (url, allowedOrigins) => {
+  if (!url) return false;
+  return allowedOrigins.some((origin) => new RegExp(`^${origin.replace(/\/$/, '')}`).test(url));
 };
-// app.use((req, res, next) => {
-//   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-//   console.log(`IP address of incoming request: ${ip}`);
-//   next();
-// });
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const referrer = req.headers.referer;
+  const originMatches = matchUrl(origin, allowedOrigins);
+  const referrerMatches = matchUrl(referrer, allowedOrigins);  
+  console.log(originMatches, referrerMatches);
+  if (originMatches && referrerMatches) {
+    console.log(`Request from ${origin} -> ${referrer} allowed`);
+    next();
+  } else {
+    console.log(`Request from ${origin} -> ${referrer} rejected`);
+    res.status(403).json({ success: false, message: "Access denied" });
+  }
+});
 
 
-// // Middleware function to log IP address
-// app.use((req, res, next) => {
-//   let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-//   if (ip.startsWith("::ffff:")) {
-//     ip = ip.replace("::ffff:", "");
-//   }
-  
-//   console.log(`IP address of incoming request: ${ip}`);
-//   next();
-// });
 
-  
-  
 // // Body parsing with size limits
-app.use(express.json({ limit: "100kb" }));
-app.use(express.urlencoded({ limit: "100kb", extended: true }));
+app.use(express.json({ limit: "1000kb" }));
+app.use(express.urlencoded({ limit: "1000kb", extended: true }));
 
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
