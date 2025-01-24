@@ -27,16 +27,12 @@ const app = express();
 
 // Logging
 app.use(morgan("combined"));
-console.log(process.env.NODE_ENV,process.env.FRONTEND_URL)
+
+
 // CORS configuration
-const allowedOrigins =
-  process.env.NODE_ENV === "production"
-    ? [process.env.FRONTEND_URL]
-    : [
-        "http://localhost:4173",
-        "http://localhost:5173",
-        "http://192.168.152.1:5173",
-      ];
+const allowedOrigins =  process.env.NODE_ENV === "production"  ? [process.env.FRONTEND_URL] : [  "http://localhost:4173",  "http://localhost:5173",
+        "http://192.168.152.1:5173", ];
+        
 app.use(
   cors({
     origin: allowedOrigins,
@@ -44,7 +40,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-
+console.log(process.env.NODE_ENV,process.env.FRONTEND_URL)
 // Helmet configuration
 app.use(
   helmet({
@@ -110,7 +106,7 @@ app.use((req, res, next) => {
   const originMatches = matchUrl(origin, allowedOrigins);
   const referrerMatches = matchUrl(referrer, allowedOrigins);  
   console.log(originMatches, referrerMatches);
-  if (originMatches && referrerMatches) {
+  if (originMatches || referrerMatches) {
     console.log(`Request from ${origin} -> ${referrer} allowed`);
     next();
   } else {
@@ -133,7 +129,6 @@ app.use("/api/v1/accessory",  accessoryRouter);
 app.use("/api/v1/order", verifyToken,checkAdminRole,  orderRouter);
 app.use("/api/v1/state", stateRouter);
 app.use("/api/v1/webquote", webQuoteRouter);
-app.use("/api/v1/accessory", accessoryRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
 
