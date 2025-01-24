@@ -36,6 +36,7 @@ const allowedOrigins =
         "http://localhost:4173",
         "http://localhost:5173",
         "http://192.168.152.1:5173",
+        "https://equipter-frontend.vercel.app"
       ];
 app.use(
   cors({
