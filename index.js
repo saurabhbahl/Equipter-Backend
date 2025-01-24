@@ -36,7 +36,6 @@ const allowedOrigins =
         "http://localhost:4173",
         "http://localhost:5173",
         "http://192.168.152.1:5173",
-        ""
       ];
 app.use(
   cors({
@@ -45,7 +44,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-
+console.log(allowedOrigins)
 // Helmet configuration
 app.use(
   helmet({
@@ -113,25 +112,25 @@ app.use(express.urlencoded({ limit: "100kb", extended: true }));
 
 
 
-const matchUrl = (url, allowedOrigins) => {
-  if (!url) return false;
-  return allowedOrigins.some((origin) => new RegExp(`^${origin.replace(/\/$/, '')}`).test(url));
-};
+// const matchUrl = (url, allowedOrigins) => {
+//   if (!url) return false;
+//   return allowedOrigins.some((origin) => new RegExp(`^${origin.replace(/\/$/, '')}`).test(url));
+// };
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const referrer = req.headers.referer;
-  const originMatches = matchUrl(origin, allowedOrigins);
-  const referrerMatches = matchUrl(referrer, allowedOrigins);  
-  console.log(originMatches, referrerMatches);
-  if (originMatches || referrerMatches) {
-    console.log(`Request from ${origin} -> ${referrer} allowed`);
-    next();
-  } else {
-    console.log(`Request from ${origin} -> ${referrer} rejected`);
-    res.status(403).json({ success: false, message: "Access denied" });
-  }
-});
+// app.use((req, res, next) => {
+//   const origin = req.headers.origin;
+//   const referrer = req.headers.referer;
+//   const originMatches = matchUrl(origin, allowedOrigins);
+//   const referrerMatches = matchUrl(referrer, allowedOrigins);  
+//   console.log(originMatches, referrerMatches);
+//   if (originMatches || referrerMatches) {
+//     console.log(`Request from ${origin} -> ${referrer} allowed`);
+//     next();
+//   } else {
+//     console.log(`Request from ${origin} -> ${referrer} rejected`);
+//     res.status(403).json({ success: false, message: "Access denied" });
+//   }
+// });
 
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
