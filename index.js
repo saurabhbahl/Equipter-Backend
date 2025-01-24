@@ -28,11 +28,16 @@ const app = express();
 // Logging
 app.use(morgan("combined"));
 
-
 // CORS configuration
-const allowedOrigins =  process.env.NODE_ENV === "production"  ? [process.env.FRONTEND_URL] : [  "http://localhost:4173",  "http://localhost:5173",
-        "http://192.168.152.1:5173", ];
-        
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [process.env.FRONTEND_URL]
+    : [
+        "http://localhost:4173",
+        "http://localhost:5173",
+        "http://192.168.152.1:5173",
+        ""
+      ];
 app.use(
   cors({
     origin: allowedOrigins,
@@ -40,7 +45,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-console.log(process.env.NODE_ENV,process.env.FRONTEND_URL)
+
 // Helmet configuration
 app.use(
   helmet({
@@ -80,6 +85,11 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+app.use((req, res, next) => {
+  console.log("Request coming from IP:", req.ip);
+  next();
+});
+
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
 
@@ -89,11 +99,19 @@ app.use((req, res, next) => {
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   if (ip.startsWith("::ffff:")) {
     ip = ip.replace("::ffff:", "");
-  }
-  
+  }  
   console.log(`IP address of incoming request: ${ip}`);
   next();
 });
+  
+  
+// // Body parsing with size limits
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ limit: "100kb", extended: true }));
+
+
+
+
 
 const matchUrl = (url, allowedOrigins) => {
   if (!url) return false;
@@ -115,12 +133,6 @@ app.use((req, res, next) => {
   }
 });
 
-
-
-// // Body parsing with size limits
-app.use(express.json({ limit: "1000kb" }));
-app.use(express.urlencoded({ limit: "1000kb", extended: true }));
-
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
 app.use("/api/v1/user", verifyToken, checkAdminRole, userRouter);
@@ -129,6 +141,7 @@ app.use("/api/v1/accessory",  accessoryRouter);
 app.use("/api/v1/order", verifyToken,checkAdminRole,  orderRouter);
 app.use("/api/v1/state", stateRouter);
 app.use("/api/v1/webquote", webQuoteRouter);
+app.use("/api/v1/accessory", accessoryRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
 
