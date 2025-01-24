@@ -1,6 +1,10 @@
 import { count, eq, and, gte, like, sql } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { quoteAccessory, webQuote } from "../models/tables.js";
+import { z } from "zod";
+import { getDetailedErrors } from "../utils/validationUtil.js";
+import { MAILER_EMAIL, MAILER_PASSWORD } from "../useENV.js";
+import nodemailer from "nodemailer";
 
 export class webQuoteService {
   static async getAllWebQuotesWithRelatedData(req, res) {
@@ -65,6 +69,31 @@ export class webQuoteService {
         totalPages: Math.ceil(totalCount / limitInt),
         data: webQuoteRes,
       });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async getWebQuote(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Missing quote ID" });
+      }
+      const data = await dbInstance
+      .select()
+      .from(webQuote)
+      .where(eq(webQuote.id, id));
+
+    if (!data.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Web Quote not found" });
+    }
+    return res.json({ success: true, data: data });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, error: error.message });
@@ -181,5 +210,83 @@ export class webQuoteService {
       console.error(error);
       res.status(500).json({ success: false, error: error.message });
     }
+  }
+
+  static async sendMail(req, res) {
+    const validation = z.object({
+      email: z.string().email('Invalid email format'),
+      secondary_email: z.string().email().optional().nullable(),
+      webQuote_url: z.string(),
+      product_name: z.string().min(1, 'product name is required'),
+    });
+  
+    const parsedData = validation.safeParse(req.body);
+    if (!parsedData.success) {
+      const errorDetails = await getDetailedErrors(parsedData);
+      return res.status(400).json({
+        success: false,
+        message: "Validation errors",
+        errors: errorDetails,
+      });
+    }
+  
+    const { email, secondary_email, webQuote_url, product_name } = parsedData.data;
+  
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      host: "smtp.gmail.com",
+      secure: true,
+      port: 465,
+      auth: {
+        user: MAILER_EMAIL,
+        pass: MAILER_PASSWORD,
+      },
+    });
+  
+    // Define the common email content
+    const emailContent = `
+      <div style="font-family: 'Work Sans', sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #e1e1e1; border-radius: 10px; background-color: #f5f5f5;">
+        <h1 style="color: #ea7600; text-align: center; font-size: 32px; margin-bottom: 20px;">Equipter Product - ${product_name}</h1>
+        <p style="color: #444; font-size: 17px;"><a href="${webQuote_url}">Here</a> is your build configuration. Click and check your build</p>
+        <a href="${webQuote_url}">${webQuote_url}</a>
+        <p style="color: #444; font-size: 17px;">Thank you!</p>
+      </div>
+    `;
+  
+    // Send the primary email
+    const mailOptionsPrimary = {
+      from: MAILER_EMAIL,
+      to: email,
+      subject: `Equipter Product - ${product_name}`,
+      html: emailContent,
+    };
+  
+    // Send to the primary email address first
+    transporter.sendMail(mailOptionsPrimary, (err, info) => {
+      if (err) {
+        return res.status(500).json({ message: err.message, success: false });
+      }
+  
+      // If a secondary email is provided, send a separate email to it
+      if (secondary_email) {
+        const mailOptionsSecondary = {
+          from: MAILER_EMAIL,
+          to: secondary_email,
+          subject: `Equipter Product - ${product_name}`,
+          html: emailContent,
+        };
+  
+        // Send the email to the secondary email
+        transporter.sendMail(mailOptionsSecondary, (err2, info2) => {
+          if (err2) {
+            return res.status(500).json({ message: err2.message, success: false });
+          }
+          res.status(200).json({ message: "Web Quote link sent to both emails.", success: true });
+        });
+      } else {
+        // If no secondary email, just return success for the primary email
+        return res.status(200).json({ message: "Web Quote link sent.", success: true });
+      }
+    });
   }
 }
