@@ -75,7 +75,6 @@ export class webQuoteService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async getWebQuote(req, res) {
     try {
       const { id } = req.params;
@@ -100,7 +99,6 @@ export class webQuoteService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async createNewWebQuote(req, res) {
     try {
       // 1) Validate request body
@@ -161,7 +159,6 @@ export class webQuoteService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async deleteSingleWebQuoteById(req, res) {
     try {
       const { id } = req.params;
@@ -183,7 +180,6 @@ export class webQuoteService {
       res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async updateSingleWebQuoteById(req, res) {
     try {
       const { id } = req.params;
@@ -212,7 +208,6 @@ export class webQuoteService {
       res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async sendMail(req, res) {
     const validation = z.object({
       email: z.string().email('Invalid email format'),
@@ -290,48 +285,62 @@ export class webQuoteService {
       }
     });
   }
-  
   static async createQuoteAccessory(req, res) {
     try {
+      const data = req.body?.quoteAccessoiesData;
 
-      const {
-        webquote_id,
-        accessory_id,
-        accessory_name,
-        quantity,
-        unit_price,
-        total_price,
-      } = req.body;
-
-
-      if (!webquote_id || !accessory_id || !accessory_name) {
-        return res.status(400).json({ success: false, message: "Missing fields." });
+      if (!data) {
+        return res.status(400).json({ success: false, message: "No data provided." });
       }
-
- 
-      const [createdAccessory] = await dbInstance
+      console.log(data)
+  
+      // Determine if the incoming data is an array or a single object
+      const isArray = Array.isArray(data);
+      const accessories = isArray ? data : [data];
+  
+      // Validate each accessory object
+      for (const accessory of accessories) {
+        const { webquote_id, accessory_id, accessory_name, quantity, unit_price, total_price } = accessory;
+        if (!webquote_id || !accessory_id || !accessory_name) {
+          return res.status(400).json({ success: false, message: "Missing required fields in one or more accessories." });
+        }
+  
+      
+        if (isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) <= 0) {
+          return res.status(400).json({ success: false, message: "Invalid quantity for one or more accessories." });
+        }
+        if (isNaN(parseFloat(unit_price)) || parseFloat(unit_price) < 0) {
+          return res.status(400).json({ success: false, message: "Invalid unit price for one or more accessories." });
+        }
+        if (isNaN(parseFloat(total_price)) || parseFloat(total_price) < 0) {
+          return res.status(400).json({ success: false, message: "Invalid total price for one or more accessories." });
+        }
+      }
+  
+     
+      const insertValues = accessories.map(acc => ({
+        webquote_id: acc.webquote_id,
+        accessory_id: acc.accessory_id,
+        accessory_name: acc.accessory_name,
+        quantity: parseInt(acc.quantity, 10) || 1,
+        unit_price: parseFloat(acc.unit_price),
+        total_price: parseFloat(acc.total_price),
+      }));
+  console.log("insertValues=>",insertValues)
+   
+      const createdAccessories = await dbInstance
         .insert(quoteAccessory)
-        .values({
-          webquote_id,
-          accessory_id,
-          accessory_name,
-          quantity: parseInt(quantity, 10),
-          unit_price: parseFloat(unit_price),
-          total_price: parseFloat(total_price),
-        })
+        .values(insertValues)
         .returning();
-
-      // Respond with the inserted record
+  
+   
       return res.status(201).json({
         success: true,
-        data: createdAccessory,
+        data: isArray ? createdAccessories : createdAccessories[0],
       });
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, error: error.message });
+      console.error("Error creating quote accessories:", error);
+      return res.status(500).json({ success: false, error: "Internal Server Error." });
     }
-  }
-
-  
-  
+  }  
 }
