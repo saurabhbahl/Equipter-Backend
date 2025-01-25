@@ -1,6 +1,10 @@
-import { count, eq, and, gte, like, sql } from "drizzle-orm";
+import { count, eq, and, gte, like, sql, desc } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { quoteAccessory, webQuote } from "../models/tables.js";
+import { z } from "zod";
+import { getDetailedErrors } from "../utils/validationUtil.js";
+import { MAILER_EMAIL, MAILER_PASSWORD } from "../useENV.js";
+import nodemailer from "nodemailer";
 
 export class webQuoteService {
   static async getAllWebQuotesWithRelatedData(req, res) {
@@ -41,15 +45,16 @@ export class webQuoteService {
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }
-      let baseQuery = dbInstance.select().from(webQuote);
-      let countQuery = dbInstance.select({ total: count() }).from(webQuote);
+      let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
+      
+      let countQuery = dbInstance.select({ total: count() }).from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
 
     
       if (whereClauses.length > 0) {
         baseQuery = baseQuery.where(and(...whereClauses));
         countQuery = countQuery.where(and(...whereClauses));
       }     
-      baseQuery = baseQuery.limit(limitInt).offset(offset);
+      baseQuery = baseQuery.limit(limitInt).offset(offset).orderBy(desc(webQuote.created_at));
 
      const [webQuoteRes, totalCountRes] = await Promise.all([
         baseQuery,
@@ -70,7 +75,30 @@ export class webQuoteService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
+  static async getWebQuote(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Missing quote ID" });
+      }
+      const data = await dbInstance
+      .select()
+      .from(webQuote)
+      .where(eq(webQuote.id, id));
 
+    if (!data.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Web Quote not found" });
+    }
+    return res.json({ success: true, data: data });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
   static async createNewWebQuote(req, res) {
     try {
       // 1) Validate request body
@@ -131,7 +159,6 @@ export class webQuoteService {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async deleteSingleWebQuoteById(req, res) {
     try {
       const { id } = req.params;
@@ -153,7 +180,6 @@ export class webQuoteService {
       res.status(500).json({ success: false, error: error.message });
     }
   }
-
   static async updateSingleWebQuoteById(req, res) {
     try {
       const { id } = req.params;
@@ -182,4 +208,139 @@ export class webQuoteService {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+  static async sendMail(req, res) {
+    const validation = z.object({
+      email: z.string().email('Invalid email format'),
+      secondary_email: z.string().email().optional().nullable(),
+      webQuote_url: z.string(),
+      product_name: z.string().min(1, 'product name is required'),
+    });
+  
+    const parsedData = validation.safeParse(req.body);
+    if (!parsedData.success) {
+      const errorDetails = await getDetailedErrors(parsedData);
+      return res.status(400).json({
+        success: false,
+        message: "Validation errors",
+        errors: errorDetails,
+      });
+    }
+  
+    const { email, secondary_email, webQuote_url, product_name } = parsedData.data;
+  
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      host: "smtp.gmail.com",
+      secure: true,
+      port: 465,
+      auth: {
+        user: MAILER_EMAIL,
+        pass: MAILER_PASSWORD,
+      },
+    });
+  
+    // Define the common email content
+    const emailContent = `
+      <div style="font-family: 'Work Sans', sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #e1e1e1; border-radius: 10px; background-color: #f5f5f5;">
+        <h1 style="color: #ea7600; text-align: center; font-size: 32px; margin-bottom: 20px;">Equipter Product - ${product_name}</h1>
+        <p style="color: #444; font-size: 17px;"><a href="${webQuote_url}">Here</a> is your build configuration. Click and check your build</p>
+        <a href="${webQuote_url}">${webQuote_url}</a>
+        <p style="color: #444; font-size: 17px;">Thank you!</p>
+      </div>
+    `;
+  
+    // Send the primary email
+    const mailOptionsPrimary = {
+      from: MAILER_EMAIL,
+      to: email,
+      subject: `Equipter Product - ${product_name}`,
+      html: emailContent,
+    };
+  
+    // Send to the primary email address first
+    transporter.sendMail(mailOptionsPrimary, (err, info) => {
+      if (err) {
+        return res.status(500).json({ message: err.message, success: false });
+      }
+  
+      // If a secondary email is provided, send a separate email to it
+      if (secondary_email) {
+        const mailOptionsSecondary = {
+          from: MAILER_EMAIL,
+          to: secondary_email,
+          subject: `Equipter Product - ${product_name}`,
+          html: emailContent,
+        };
+  
+        // Send the email to the secondary email
+        transporter.sendMail(mailOptionsSecondary, (err2, info2) => {
+          if (err2) {
+            return res.status(500).json({ message: err2.message, success: false });
+          }
+          res.status(200).json({ message: "Web Quote link sent to both emails.", success: true });
+        });
+      } else {
+        // If no secondary email, just return success for the primary email
+        return res.status(200).json({ message: "Web Quote link sent.", success: true });
+      }
+    });
+  }
+  static async createQuoteAccessory(req, res) {
+    try {
+      const data = req.body?.quoteAccessoiesData;
+
+      if (!data) {
+        return res.status(400).json({ success: false, message: "No data provided." });
+      }
+      console.log(data)
+  
+      // Determine if the incoming data is an array or a single object
+      const isArray = Array.isArray(data);
+      const accessories = isArray ? data : [data];
+  
+      // Validate each accessory object
+      for (const accessory of accessories) {
+        const { webquote_id, accessory_id, accessory_name, quantity, unit_price, total_price } = accessory;
+        if (!webquote_id || !accessory_id || !accessory_name) {
+          return res.status(400).json({ success: false, message: "Missing required fields in one or more accessories." });
+        }
+  
+      
+        if (isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) <= 0) {
+          return res.status(400).json({ success: false, message: "Invalid quantity for one or more accessories." });
+        }
+        if (isNaN(parseFloat(unit_price)) || parseFloat(unit_price) < 0) {
+          return res.status(400).json({ success: false, message: "Invalid unit price for one or more accessories." });
+        }
+        if (isNaN(parseFloat(total_price)) || parseFloat(total_price) < 0) {
+          return res.status(400).json({ success: false, message: "Invalid total price for one or more accessories." });
+        }
+      }
+  
+     
+      const insertValues = accessories.map(acc => ({
+        webquote_id: acc.webquote_id,
+        accessory_id: acc.accessory_id,
+        accessory_name: acc.accessory_name,
+        quantity: parseInt(acc.quantity, 10) || 1,
+        unit_price: parseFloat(acc.unit_price),
+        total_price: parseFloat(acc.total_price),
+      }));
+  console.log("insertValues=>",insertValues)
+   
+      const createdAccessories = await dbInstance
+        .insert(quoteAccessory)
+        .values(insertValues)
+        .returning();
+  
+   
+      return res.status(201).json({
+        success: true,
+        data: isArray ? createdAccessories : createdAccessories[0],
+      });
+    } catch (error) {
+      console.error("Error creating quote accessories:", error);
+      return res.status(500).json({ success: false, error: "Internal Server Error." });
+    }
+  }  
 }

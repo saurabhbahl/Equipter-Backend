@@ -30,6 +30,3 @@ export async function orderSeeder() {
     console.error("Error seeding Orders:", error);
   }
 }
-
-
-orderSeeder();
