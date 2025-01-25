@@ -9,4 +9,10 @@ webQuoteRouter.delete("/:id", webQuoteService.deleteSingleWebQuoteById);
 webQuoteRouter.put("/:id", webQuoteService.updateSingleWebQuoteById);
 webQuoteRouter.post("/send-mail", webQuoteService.sendMail);
 
+
+// quote accessory
+webQuoteRouter.post("/quote-accessory",webQuoteService.createQuoteAccessory)
+
+
+
 export default webQuoteRouter;

@@ -1,4 +1,4 @@
-import { count, eq, and, gte, like, sql } from "drizzle-orm";
+import { count, eq, and, gte, like, sql, desc } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { quoteAccessory, webQuote } from "../models/tables.js";
 import { z } from "zod";
@@ -45,15 +45,16 @@ export class webQuoteService {
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }
-      let baseQuery = dbInstance.select().from(webQuote);
-      let countQuery = dbInstance.select({ total: count() }).from(webQuote);
+      let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
+      
+      let countQuery = dbInstance.select({ total: count() }).from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
 
     
       if (whereClauses.length > 0) {
         baseQuery = baseQuery.where(and(...whereClauses));
         countQuery = countQuery.where(and(...whereClauses));
       }     
-      baseQuery = baseQuery.limit(limitInt).offset(offset);
+      baseQuery = baseQuery.limit(limitInt).offset(offset).orderBy(desc(webQuote.created_at));
 
      const [webQuoteRes, totalCountRes] = await Promise.all([
         baseQuery,
@@ -289,4 +290,48 @@ export class webQuoteService {
       }
     });
   }
+  
+  static async createQuoteAccessory(req, res) {
+    try {
+
+      const {
+        webquote_id,
+        accessory_id,
+        accessory_name,
+        quantity,
+        unit_price,
+        total_price,
+      } = req.body;
+
+
+      if (!webquote_id || !accessory_id || !accessory_name) {
+        return res.status(400).json({ success: false, message: "Missing fields." });
+      }
+
+ 
+      const [createdAccessory] = await dbInstance
+        .insert(quoteAccessory)
+        .values({
+          webquote_id,
+          accessory_id,
+          accessory_name,
+          quantity: parseInt(quantity, 10),
+          unit_price: parseFloat(unit_price),
+          total_price: parseFloat(total_price),
+        })
+        .returning();
+
+      // Respond with the inserted record
+      return res.status(201).json({
+        success: true,
+        data: createdAccessory,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  
+  
 }
