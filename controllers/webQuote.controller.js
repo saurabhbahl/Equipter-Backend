@@ -43,6 +43,8 @@ export class webQuoteService {
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }
+      // let baseQuery = dbInstance.select().from(webQuote)
+      ;
       // let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
       let baseQuery = dbInstance
         .select({
@@ -228,11 +230,14 @@ export class webQuoteService {
   static async sendMail(req, res) {
     const validation = z.object({
       email: z.string().email("Invalid email format"),
-      secondary_email: z.string().email().optional().nullable(),
+      secondary_email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal("")),
       webQuote_url: z.string(),
       product_name: z.string().min(1, "product name is required"),
     });
+  
 
+  
+    
     const parsedData = validation.safeParse(req.body);
     if (!parsedData.success) {
       const errorDetails = await getDetailedErrors(parsedData);
