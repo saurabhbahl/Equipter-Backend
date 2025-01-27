@@ -96,9 +96,14 @@ export class webQuoteService {
           .json({ success: false, error: "Missing quote ID" });
       }
       const data = await dbInstance
-        .select()
-        .from(webQuote)
-        .where(eq(webQuote.id, id));
+      .select({
+        ...webQuote, 
+        quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`, 
+      })
+      .from(webQuote)
+      .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
+      .groupBy(webQuote.id);
+
 
       if (!data.length) {
         return res
