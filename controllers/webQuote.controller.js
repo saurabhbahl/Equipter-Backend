@@ -12,10 +12,10 @@ export class webQuoteService {
       const {
         page = 1,
         limit = 10,
-        stage, 
-        financing, 
+        stage,
+        financing,
         id,
-        dateFilter, 
+        dateFilter,
       } = req.query;
 
       const pageInt = parseInt(page, 10) || 1;
@@ -27,36 +27,48 @@ export class webQuoteService {
       if (stage) {
         whereClauses.push(eq(webQuote.stage, stage));
       }
-     if (id) {
-          whereClauses.push(
-          sql`${webQuote.id}::text ILIKE ${`%${id}%`}`
-        ); 
+      if (id) {
+        whereClauses.push(sql`${webQuote.id}::text ILIKE ${`%${id}%`}`);
       }
 
-     if (financing) {
+      if (financing) {
         whereClauses.push(eq(webQuote.financing, financing));
-      }     
+      }
       if (dateFilter) {
         const days = parseInt(dateFilter, 10);
-        console.log(days)
+        console.log(days);
         if (!isNaN(days) && days > 0) {
           const dateThreshold = new Date();
           dateThreshold.setDate(dateThreshold.getDate() - days);
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }
-      let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
-      
-      let countQuery = dbInstance.select({ total: count() }).from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
+      // let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
+      let baseQuery = dbInstance
+        .select({
+          ...webQuote, 
+          // quote_accessory: sql`COALESCE(
+          //   JSON_AGG(DISTINCT row_to_json(${quoteAccessory}.*)), '[]'::jsonb
+          // )`.as('quote_accessory')
+          quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`, 
+        })
+        .from(webQuote)
+        .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
+        .groupBy(webQuote.id);
+        
+        // web_quote
+      let countQuery = dbInstance.select({ total: count() }).from(webQuote);
 
-    
       if (whereClauses.length > 0) {
         baseQuery = baseQuery.where(and(...whereClauses));
         countQuery = countQuery.where(and(...whereClauses));
-      }     
-      baseQuery = baseQuery.limit(limitInt).offset(offset).orderBy(desc(webQuote.created_at));
+      }
+      baseQuery = baseQuery
+        .limit(limitInt)
+        .offset(offset)
+        .orderBy(desc(webQuote.created_at));
 
-     const [webQuoteRes, totalCountRes] = await Promise.all([
+      const [webQuoteRes, totalCountRes] = await Promise.all([
         baseQuery,
         countQuery,
       ]);
@@ -84,16 +96,16 @@ export class webQuoteService {
           .json({ success: false, error: "Missing quote ID" });
       }
       const data = await dbInstance
-      .select()
-      .from(webQuote)
-      .where(eq(webQuote.id, id));
+        .select()
+        .from(webQuote)
+        .where(eq(webQuote.id, id));
 
-    if (!data.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Web Quote not found" });
-    }
-    return res.json({ success: true, data: data });
+      if (!data.length) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Web Quote not found" });
+      }
+      return res.json({ success: true, data: data });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, error: error.message });
@@ -210,12 +222,12 @@ export class webQuoteService {
   }
   static async sendMail(req, res) {
     const validation = z.object({
-      email: z.string().email('Invalid email format'),
+      email: z.string().email("Invalid email format"),
       secondary_email: z.string().email().optional().nullable(),
       webQuote_url: z.string(),
-      product_name: z.string().min(1, 'product name is required'),
+      product_name: z.string().min(1, "product name is required"),
     });
-  
+
     const parsedData = validation.safeParse(req.body);
     if (!parsedData.success) {
       const errorDetails = await getDetailedErrors(parsedData);
@@ -225,9 +237,10 @@ export class webQuoteService {
         errors: errorDetails,
       });
     }
-  
-    const { email, secondary_email, webQuote_url, product_name } = parsedData.data;
-  
+
+    const { email, secondary_email, webQuote_url, product_name } =
+      parsedData.data;
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       host: "smtp.gmail.com",
@@ -238,7 +251,7 @@ export class webQuoteService {
         pass: MAILER_PASSWORD,
       },
     });
-  
+
     // Define the common email content
     const emailContent = `
       <div style="font-family: 'Work Sans', sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #e1e1e1; border-radius: 10px; background-color: #f5f5f5;">
@@ -248,7 +261,7 @@ export class webQuoteService {
         <p style="color: #444; font-size: 17px;">Thank you!</p>
       </div>
     `;
-  
+
     // Send the primary email
     const mailOptionsPrimary = {
       from: MAILER_EMAIL,
@@ -256,13 +269,13 @@ export class webQuoteService {
       subject: `Equipter Product - ${product_name}`,
       html: emailContent,
     };
-  
+
     // Send to the primary email address first
     transporter.sendMail(mailOptionsPrimary, (err, info) => {
       if (err) {
         return res.status(500).json({ message: err.message, success: false });
       }
-  
+
       // If a secondary email is provided, send a separate email to it
       if (secondary_email) {
         const mailOptionsSecondary = {
@@ -271,17 +284,26 @@ export class webQuoteService {
           subject: `Equipter Product - ${product_name}`,
           html: emailContent,
         };
-  
+
         // Send the email to the secondary email
         transporter.sendMail(mailOptionsSecondary, (err2, info2) => {
           if (err2) {
-            return res.status(500).json({ message: err2.message, success: false });
+            return res
+              .status(500)
+              .json({ message: err2.message, success: false });
           }
-          res.status(200).json({ message: "Web Quote link sent to both emails.", success: true });
+          res
+            .status(200)
+            .json({
+              message: "Web Quote link sent to both emails.",
+              success: true,
+            });
         });
       } else {
         // If no secondary email, just return success for the primary email
-        return res.status(200).json({ message: "Web Quote link sent.", success: true });
+        return res
+          .status(200)
+          .json({ message: "Web Quote link sent.", success: true });
       }
     });
   }
@@ -290,35 +312,62 @@ export class webQuoteService {
       const data = req.body?.quoteAccessoiesData;
 
       if (!data) {
-        return res.status(400).json({ success: false, message: "No data provided." });
+        return res
+          .status(400)
+          .json({ success: false, message: "No data provided." });
       }
-      console.log(data)
-  
+      console.log(data);
+
       // Determine if the incoming data is an array or a single object
       const isArray = Array.isArray(data);
       const accessories = isArray ? data : [data];
-  
+
       // Validate each accessory object
       for (const accessory of accessories) {
-        const { webquote_id, accessory_id, accessory_name, quantity, unit_price, total_price } = accessory;
+        const {
+          webquote_id,
+          accessory_id,
+          accessory_name,
+          quantity,
+          unit_price,
+          total_price,
+        } = accessory;
         if (!webquote_id || !accessory_id || !accessory_name) {
-          return res.status(400).json({ success: false, message: "Missing required fields in one or more accessories." });
+          return res
+            .status(400)
+            .json({
+              success: false,
+              message: "Missing required fields in one or more accessories.",
+            });
         }
-  
-      
+
         if (isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) <= 0) {
-          return res.status(400).json({ success: false, message: "Invalid quantity for one or more accessories." });
+          return res
+            .status(400)
+            .json({
+              success: false,
+              message: "Invalid quantity for one or more accessories.",
+            });
         }
         if (isNaN(parseFloat(unit_price)) || parseFloat(unit_price) < 0) {
-          return res.status(400).json({ success: false, message: "Invalid unit price for one or more accessories." });
+          return res
+            .status(400)
+            .json({
+              success: false,
+              message: "Invalid unit price for one or more accessories.",
+            });
         }
         if (isNaN(parseFloat(total_price)) || parseFloat(total_price) < 0) {
-          return res.status(400).json({ success: false, message: "Invalid total price for one or more accessories." });
+          return res
+            .status(400)
+            .json({
+              success: false,
+              message: "Invalid total price for one or more accessories.",
+            });
         }
       }
-  
-     
-      const insertValues = accessories.map(acc => ({
+
+      const insertValues = accessories.map((acc) => ({
         webquote_id: acc.webquote_id,
         accessory_id: acc.accessory_id,
         accessory_name: acc.accessory_name,
@@ -326,21 +375,22 @@ export class webQuoteService {
         unit_price: parseFloat(acc.unit_price),
         total_price: parseFloat(acc.total_price),
       }));
-  console.log("insertValues=>",insertValues)
-   
+      console.log("insertValues=>", insertValues);
+
       const createdAccessories = await dbInstance
         .insert(quoteAccessory)
         .values(insertValues)
         .returning();
-  
-   
+
       return res.status(201).json({
         success: true,
         data: isArray ? createdAccessories : createdAccessories[0],
       });
     } catch (error) {
       console.error("Error creating quote accessories:", error);
-      return res.status(500).json({ success: false, error: "Internal Server Error." });
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal Server Error." });
     }
-  }  
+  }
 }
