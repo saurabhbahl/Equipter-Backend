@@ -6,6 +6,6 @@ const paymentRouter = express.Router();
 paymentRouter.post("/makePayment", paymentService.makePayment);
 paymentRouter.post("/sendInvoice", paymentService.createInvoiceAndSendEmail);
 paymentRouter.post("/create-checkout-session", paymentService.createCheckoutSession);
-paymentRouter.post("/webhook", paymentService.handleWebhook);
+// paymentRouter.post("/webhook",express.raw({type: 'application/json'}), paymentService.handleWebhook);
 
 export default paymentRouter

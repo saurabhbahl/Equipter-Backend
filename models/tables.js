@@ -247,7 +247,7 @@ export const order = pgTable("order", {
 //17
 export const developmentStage = pgTable("development_stage", {
   id: uuid("id").primaryKey().defaultRandom(),
-  product_order_id: uuid("product_order_id").references(() => order.id,),
+  product_order_id: uuid("product_order_id").references(() => order.id,{onDelete:"set null",onUpdate:"set null"}),
   stage_name: text("stage_name").notNull(),
   stage_status: developmentStatus("stage_status").notNull(),
   started_at: timestamp("started_at"),
