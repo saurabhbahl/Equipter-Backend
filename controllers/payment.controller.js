@@ -1,14 +1,18 @@
 import Stripe from "stripe";
 import {
   accessory,
+  order,
   product,
+  productImage,
   quoteAccessory,
   state,
   webQuote,
 } from "../models/tables.js";
+import jwt from "jsonwebtoken";
 import { dbInstance } from "../config/dbConnection.cjs";
 import { eq } from "drizzle-orm";
 import { capitalize } from "../utils/helpers.js";
+import { JWT_SECRET } from "../useENV.js";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-12-18.acacia",
 });
@@ -86,8 +90,6 @@ export class paymentService {
   static async createCheckoutSession(req, res) {
     try {
       const { webQuoteId, currency = "usd" } = req.body;
-      console.log("CHECKOUT SESSION:", webQuoteId, currency);
-
       if (!webQuoteId || !currency) {
         return res.status(400).json({
           success: false,
@@ -110,24 +112,29 @@ export class paymentService {
         });
       }
       console.log("webQuoteRes:", webQuoteRes);
- 
+      const productImages = await dbInstance
+        .select()
+        .from(productImage)
+        .where(eq(productImage.product_id, webQuoteRes.product.id));
+      const featureImage =
+        productImages.find((img) => img.is_featured == true) ||
+        productImages[0];
 
       const deliveryStateRes = await dbInstance
-      .select()
-      .from(state)
-      .where(eq(state.id, webQuoteRes.web_quote.delivery_address_state_id))
-    
-    // Fetch billing state information
-    const billingStateRes = await dbInstance
-      .select()
-      .from(state)
-      .where(eq(state.id, webQuoteRes.web_quote.billing_address_state))
-    
-    const stateRes = {
-      deliveryState: deliveryStateRes[0]||null,
-      billingState: billingStateRes[0] || null,
-    };
-      console.log("stateRes", stateRes);
+        .select()
+        .from(state)
+        .where(eq(state.id, webQuoteRes.web_quote.delivery_address_state_id));
+
+      // Fetch billing state information
+      const billingStateRes = await dbInstance
+        .select()
+        .from(state)
+        .where(eq(state.id, webQuoteRes.web_quote.billing_address_state));
+
+      const stateRes = {
+        deliveryState: deliveryStateRes[0] || null,
+        billingState: billingStateRes[0] || null,
+      };
 
       // Fetch accessories
       const accessories = await dbInstance
@@ -153,50 +160,61 @@ export class paymentService {
       accessories.forEach((acc) => {
         totalPrice += Number(acc.total_price) * Number(acc.quantity);
       });
-      // Calculate deposit (20% of total price)
-      let deposit = Math.ceil(totalPrice);
-      console.log("Deposit", deposit);
-      // Construct line_items
-      const lineItems = [];
 
-      // Main product
+      // Fixed deposit amount
+      const DEPOSIT_AMOUNT = 1500; // $1500 in dollars
+      const depositInCents = DEPOSIT_AMOUNT * 100;
+      let lineItems = [];
+
+      const accessoriesList = accessories
+        .map((acc) => {
+          const name =
+            acc.accessory_name.charAt(0).toUpperCase() +
+            acc.accessory_name.slice(1).toLowerCase();
+          return `• ${name} ($${acc.unit_price})`;
+        })
+        .join("\n");
+
+      const remainingBalance = (Number(totalPrice) - DEPOSIT_AMOUNT).toFixed(2);
+
+      // Use a multi-line template literal:
+      const descriptionText = `
+          Total Order Value: $${Number(totalPrice).toFixed(2)}
+          Remaining Balance: $${remainingBalance}
+        Accessories:${accessoriesList}`.trim();
+
       lineItems.push({
         price_data: {
           currency: currency.toLowerCase(),
           product_data: {
-            name: `Non-Refundable Deposit for ${webQuoteRes.product.name.capitalize()}`,
-            description: `Product ID: ${webQuoteRes.product.id}`,
+            name: `Non Refundable Deposit for ${webQuoteRes.product.name.capitalize()}`,
+            images: [featureImage.image_url],
+            description:
+              `Total Order Value: $${Number(totalPrice).toFixed(2)}\n` +
+              `Remaining Balance: $${remainingBalance}\n` +
+              `Accessories:${accessoriesList}`,
           },
-          unit_amount: deposit * 100,
+          unit_amount: depositInCents,
         },
-        quantity: webQuoteRes.web_quote.product_qty,
+        quantity: 1,
       });
 
-      //List Accessories Selected but dont add there price just deposit amount that is already calculated
-      for (const acc of accessories) {
-        const unitAmount = Math.round(Number(acc.unit_price)); // price in cents
-
-        const quantity = Number(acc.quantity);
-
-        lineItems.push({
-          price_data: {
-            currency: currency.toLowerCase(),
-            product_data: {
-              name: acc.accessory_name.capitalize(),
-              description: `Accessory ID: ${acc.accessory_id} — ($${unitAmount})`,
-            },
-            unit_amount: unitAmount * 100,
-          },
-          quantity: quantity,
-        });
-      }
-
-      console.log(
-        "Line Items:",
-        lineItems,
-        deposit,
-        webQuoteRes.web_quote.non_refundable_deposit
-      );
+      //2. Add accessories with $0 amount to display them in checkout
+      // accessories.forEach((acc) => {
+      //   lineItems.push({
+      //     price_data: {
+      //       currency: currency.toLowerCase(),
+      //       product_data: {
+      //         name: `${acc.accessory_name.capitalize()} (Included in total)`,
+      //         description: `Regular price: $${Number(acc.unit_price).toFixed(
+      //           2
+      //         )} each`,
+      //       },
+      //       unit_amount: 0, // No charge for accessories in deposit
+      //     },
+      //     quantity: acc.quantity,
+      //   });
+      // });
 
       let customer;
       let email = webQuoteRes.web_quote.contact_email;
@@ -228,25 +246,33 @@ export class paymentService {
       }
       console.log("Cus", customer);
 
-      const coupon = await stripe.coupons.create({
-        name: `Non Refundable Deposit (20% of ${deposit})`,
-        percent_off: 80, // discount 80%
-        duration: "once", // only applies one time
-        redeem_by: Math.floor(Date.now() / 1000) + 60 * 60 * 1,
-      });
-
+      // const coupon = await stripe.coupons.create({
+      //   name: `Non Refundable Deposit (20% of ${deposit})`,
+      //   percent_off: 80, // discount 80%
+      //   duration: "once", // only applies one time
+      //   redeem_by: Math.floor(Date.now() / 1000) + 60 * 60 * 1,
+      // });
+      // session
+      
+      const token = jwt.sign({ token: webQuoteId },JWT_SECRET, { expiresIn: '5m' });
+    
       // Create the Stripe Checkout Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
-        // customer_update: {},
         line_items: lineItems,
         mode: "payment",
-        discounts: [{ coupon: coupon.id }],
-        customer:customer.id,
+        metadata: {
+          webQuoteId: webQuoteId,
+        },
+        // discounts: [{ coupon: coupon.id }],
+        customer: customer.id,
         client_reference_id: customer.id,
-        success_url: `${process.env.FRONTEND_URL}success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}cancel`,
+        success_url: `${process.env.FRONTEND_URL}success?session_id=${token}`,
+        cancel_url: `${process.env.FRONTEND_URL}products/${webQuoteRes.product.product_url}?webQuote=${webQuoteId}`,
       });
+       
+      
+      
       return res.status(200).json({
         success: true,
         sessionUrl: session.url,
@@ -263,7 +289,6 @@ export class paymentService {
   static async handleWebhook(req, res) {
     const sig = req.headers["stripe-signature"];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
     let event;
 
     try {
@@ -277,17 +302,10 @@ export class paymentService {
     switch (event.type) {
       case "checkout.session.completed":
         const session = event.data.object;
-        console.log("Checkout Session completed:", session);
-        // Fulfill the purchase, e.g., update order status in DB
+        console.log("Payment succeeded for session:", session.id);
         await paymentService.fulfillOrder(session);
-        // Optionally, send custom confirmation email
-        await sendPaymentConfirmation(
-          session.customer_email,
-          session.amount_total / 100,
-          session.currency
-        );
         break;
-      // ... handle other event types
+
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
@@ -295,23 +313,35 @@ export class paymentService {
     // Return a response to acknowledge receipt of the event
     res.json({ received: true });
   }
-
-  /**
-   * Fulfill Order: Update order status in the database
-   */
   static async fulfillOrder(session) {
-    const webQuoteId = session.metadata.webQuoteId;
-    if (!webQuoteId) {
-      console.error("No webQuoteId found in session metadata.");
-      return;
+    try {
+      console.log(session);
+      const webQuoteId = session.metadata.webQuoteId;
+      if (!webQuoteId) {
+        console.error("No webQuoteId found in session metadata.");
+        return;
+      }
+      await dbInstance
+        .update(webQuote)
+        .set({ stage: "Ordered" })
+        .where(eq(webQuote.id, webQuoteId));
+
+      // Calculate 3 months from now
+      const estimatedCompletion = new Date();
+      estimatedCompletion.setMonth(estimatedCompletion.getMonth() + 3);
+      const [newOrder] = await dbInstance
+        .insert(order)
+        .values({
+          webquote_id: webQuoteId,
+          order_status: "Pending",
+          estimated_completion_date: estimatedCompletion,
+        })
+        .returning();
+
+      console.log(`Order ${webQuoteId} has been fulfilled.`, newOrder);
+    } catch (err) {
+      console.error("Order fulfillment failed:", err);
+      throw err;
     }
-
-    // Update the webQuote in the database to mark it as paid
-    await dbInstance
-      .update(webQuote)
-      .set({ status: "paid" }) // Adjust based on your schema
-      .where(eq(webQuote.id, webQuoteId));
-
-    console.log(`Order ${webQuoteId} has been fulfilled.`);
   }
 }

@@ -21,6 +21,7 @@ import orderRouter from "./routes/order.routes.js";
 import webQuoteRouter from "./routes/webQuote.routes.js";
 import stateRouter from "./routes/state.routes.js";
 import paymentRouter from "./routes/payment.routes.js";
+import { paymentService } from "./controllers/payment.controller.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
@@ -102,9 +103,11 @@ app.use((req, res, next) => {
 
   
   
+app.post("/api/v1/payment/webhook", express.raw({ type: 'application/json' }), paymentService.handleWebhook);
 // // Body parsing with size limits
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
+
 
 // Routes
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
@@ -125,7 +128,7 @@ app.get("/api/test", (req, res) => {
 // Invalid route handling
 app.all("/api/*", async (req, res) => {
   return res.json({ success: false, data: "Invalid Route" });
-});
+})
 
 // Global error handler
 app.use((error, req, res, next) => {
