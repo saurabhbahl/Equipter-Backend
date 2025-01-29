@@ -1,6 +1,6 @@
 import { count, eq, and, gte, like, sql, desc } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
-import { quoteAccessory, webQuote } from "../models/tables.js";
+import { product, quoteAccessory, webQuote, zone } from "../models/tables.js";
 import { z } from "zod";
 import { getDetailedErrors } from "../utils/validationUtil.js";
 import { MAILER_EMAIL, MAILER_PASSWORD } from "../useENV.js";
@@ -43,22 +43,25 @@ export class webQuoteService {
           whereClauses.push(gte(webQuote.created_at, dateThreshold));
         }
       }
+      // quote_accessory: sql`COALESCE(
+      //   JSON_AGG(DISTINCT row_to_json(${quoteAccessory}.*)), '[]'::jsonb
+      // )`.as('quote_accessory')
       // let baseQuery = dbInstance.select().from(webQuote)
-      ;
       // let baseQuery = dbInstance.select().from(webQuote).leftJoin(quoteAccessory,eq(webQuote.id,quoteAccessory.webquote_id));
       let baseQuery = dbInstance
         .select({
-          ...webQuote, 
-          // quote_accessory: sql`COALESCE(
-          //   JSON_AGG(DISTINCT row_to_json(${quoteAccessory}.*)), '[]'::jsonb
-          // )`.as('quote_accessory')
-          quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`, 
+          ...webQuote,
+          quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`,
+          product_url: product.product_url,
+          zone_name:zone.zone_name
         })
         .from(webQuote)
         .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
-        .groupBy(webQuote.id);
-        
-        // web_quote
+        .leftJoin(product, eq(webQuote.product_id, product.id))
+        .leftJoin(zone,eq(zone.id,webQuote.zone_id))
+        .groupBy(webQuote.id,product.product_url,zone.zone_name);
+
+      // web_quote
       let countQuery = dbInstance.select({ total: count() }).from(webQuote);
 
       if (whereClauses.length > 0) {
@@ -92,20 +95,21 @@ export class webQuoteService {
   static async getWebQuote(req, res) {
     try {
       const { id } = req.params;
+
       if (!id) {
         return res
           .status(400)
           .json({ success: false, error: "Missing quote ID" });
       }
       const data = await dbInstance
-      .select({
-        ...webQuote, 
-        quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`, 
-      })
-      .from(webQuote)
-      .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
-      .groupBy(webQuote.id);
-
+        .select({
+          ...webQuote,
+          quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`,
+        })
+        .from(webQuote)
+        .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
+        .where(eq(webQuote.id, id))
+        .groupBy(webQuote.id);
 
       if (!data.length) {
         return res
@@ -230,14 +234,15 @@ export class webQuoteService {
   static async sendMail(req, res) {
     const validation = z.object({
       email: z.string().email("Invalid email format"),
-      secondary_email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal("")),
+      secondary_email: z
+        .string()
+        .email({ message: "Invalid email address." })
+        .optional()
+        .or(z.literal("")),
       webQuote_url: z.string(),
       product_name: z.string().min(1, "product name is required"),
     });
-  
 
-  
-    
     const parsedData = validation.safeParse(req.body);
     if (!parsedData.success) {
       const errorDetails = await getDetailedErrors(parsedData);
@@ -302,12 +307,10 @@ export class webQuoteService {
               .status(500)
               .json({ message: err2.message, success: false });
           }
-          res
-            .status(200)
-            .json({
-              message: "Web Quote link sent to both emails.",
-              success: true,
-            });
+          res.status(200).json({
+            message: "Web Quote link sent to both emails.",
+            success: true,
+          });
         });
       } else {
         // If no secondary email, just return success for the primary email
@@ -343,37 +346,29 @@ export class webQuoteService {
           total_price,
         } = accessory;
         if (!webquote_id || !accessory_id || !accessory_name) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Missing required fields in one or more accessories.",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Missing required fields in one or more accessories.",
+          });
         }
 
         if (isNaN(parseInt(quantity, 10)) || parseInt(quantity, 10) <= 0) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Invalid quantity for one or more accessories.",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Invalid quantity for one or more accessories.",
+          });
         }
         if (isNaN(parseFloat(unit_price)) || parseFloat(unit_price) < 0) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Invalid unit price for one or more accessories.",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Invalid unit price for one or more accessories.",
+          });
         }
         if (isNaN(parseFloat(total_price)) || parseFloat(total_price) < 0) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Invalid total price for one or more accessories.",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Invalid total price for one or more accessories.",
+          });
         }
       }
 

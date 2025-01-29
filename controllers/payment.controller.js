@@ -270,9 +270,7 @@ export class paymentService {
         success_url: `${process.env.FRONTEND_URL}success?session_id=${token}`,
         cancel_url: `${process.env.FRONTEND_URL}products/${webQuoteRes.product.product_url}?webQuote=${webQuoteId}`,
       });
-       
-      
-      
+             
       return res.status(200).json({
         success: true,
         sessionUrl: session.url,

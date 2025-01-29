@@ -30,13 +30,13 @@ export const state = pgTable("state", {
 });
 
 // 3
-export const zoneState = pgTable("zone_state", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  zone_id: uuid("zone_id").references(() => zone.id,{onDelete:"cascade"}),
-  state_id: uuid("state_id").references(() => state.id,{onDelete:"cascade"}),
-  created_at: timestamp("created_at").defaultNow(),
-  updated_at: timestamp("updated_at").defaultNow(),
-});
+  export const zoneState = pgTable("zone_state", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    zone_id: uuid("zone_id").references(() => zone.id,{onDelete:"cascade"}),
+    state_id: uuid("state_id").references(() => state.id,{onDelete:"cascade"}),
+    created_at: timestamp("created_at").defaultNow(),
+    updated_at: timestamp("updated_at").defaultNow(),
+  });
 
 // 4
 export const product = pgTable("product", {
