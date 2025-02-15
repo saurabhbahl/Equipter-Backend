@@ -5,7 +5,7 @@ let sfAccessToken = "00DC0000000Piso!AQEAQMZDQiWn1TACL1E9Cp.O7Asp3DbKyvR5AUnUcaI
 export async function checkSFAccessToken(req, res, next) {
   try { 
     if (sfAccessToken) {
-      console.log("Reusing cached Salesforce token");
+      console.log("Reusing cached Salesforce token",sfAccessToken);
       req.accessToken = sfAccessToken; 
       return next(); 
     }

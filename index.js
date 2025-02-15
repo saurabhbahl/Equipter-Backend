@@ -4,6 +4,7 @@ import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
 import hpp from "hpp";
+
 // connection
 import { connection } from "./config/dbConnection.cjs";
 
@@ -22,6 +23,7 @@ import webQuoteRouter from "./routes/webQuote.routes.js";
 import stateRouter from "./routes/state.routes.js";
 import paymentRouter from "./routes/payment.routes.js";
 import { paymentService } from "./controllers/payment.controller.js";
+import salesForceHooksRouter from "./routes/salesForceHooks.routes.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
@@ -87,11 +89,6 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-app.use((req, res, next) => {
-  console.log("Request coming from IP:", req.ip);
-  next();
-});
-
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
 
@@ -102,14 +99,14 @@ app.use((req, res, next) => {
 });
 
   
-  
 app.post("/api/v1/payment/webhook", express.raw({ type: 'application/json' }), paymentService.handleWebhook);
 // // Body parsing with size limits
-app.use(express.json({ limit: "100kb" }));
-app.use(express.urlencoded({ limit: "100kb", extended: true }));
+app.use(express.json({ limit: "1000kb" }));
+app.use(express.urlencoded({ limit: "1000kb", extended: true }));
 
 
 // Routes
+app.use("/api/v1/sf/hooks",salesForceHooksRouter);
 app.use("/api/v1/sf", verifyToken, checkAdminRole, salesForceRouter);
 app.use("/api/v1/user", verifyToken, checkAdminRole, userRouter);
 app.use("/api/v1/product", productRouter);
