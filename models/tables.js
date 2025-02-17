@@ -1,4 +1,4 @@
-import { pgTable, integer,uuid,uniqueIndex, text, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, integer,uuid,uniqueIndex, text, numeric, timestamp, boolean, varchar, index } from "drizzle-orm/pg-core";
 import {
   financing,
   stages,
@@ -114,6 +114,7 @@ export const shippingMethod = pgTable("shipping_method", {
 // 9
 export const webQuote = pgTable("web_quote", {
   id: uuid("id").primaryKey().defaultRandom(),
+  sfIdRef: text("sfIdRef").default("not-given"),
   stage: stages("stage").notNull().default("Quote"),
   financing: text("financing").notNull().default("cash"),
   product_id: uuid("product_id").references(() => product.id),
@@ -149,7 +150,9 @@ export const webQuote = pgTable("web_quote", {
   ),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
-});
+},(webQuote)=>[
+  index("sfIdRef_index").on(webQuote.sfIdRef)
+]);
 
 //   10
 

@@ -9,6 +9,7 @@ webQuoteRouter.get("/:id", webQuoteService.getWebQuote);
 webQuoteRouter.delete("/:id", webQuoteService.deleteSingleWebQuoteById);
 webQuoteRouter.put("/:id", webQuoteService.updateSingleWebQuoteById);
 webQuoteRouter.post("/send-mail", webQuoteService.sendMail);
+webQuoteRouter.post("/soft-lead", webQuoteService.firstPageForm);
 
 
 // quote accessory

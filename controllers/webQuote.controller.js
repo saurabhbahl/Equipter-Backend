@@ -3,9 +3,13 @@ import { dbInstance } from "../config/dbConnection.cjs";
 import { product, quoteAccessory, webQuote, zone } from "../models/tables.js";
 import { z } from "zod";
 import { getDetailedErrors } from "../utils/validationUtil.js";
-import { MAILER_EMAIL, MAILER_PASSWORD } from "../useENV.js";
+import {
+  MAILER_EMAIL,
+  MAILER_PASSWORD,
+} from "../useENV.js";
+import memoryCache from "memory-cache";
 import nodemailer from "nodemailer";
-
+import { SalesForceService } from "../services/salesForceService.js";
 export class webQuoteService {
   static async getAllWebQuotesWithRelatedData(req, res) {
     try {
@@ -53,13 +57,13 @@ export class webQuoteService {
           ...webQuote,
           quote_accessory: sql`coalesce(json_agg(${quoteAccessory}.*), '[]'::json)`,
           product_url: product.product_url,
-          zone_name:zone.zone_name
+          zone_name: zone.zone_name,
         })
         .from(webQuote)
         .leftJoin(quoteAccessory, eq(webQuote.id, quoteAccessory.webquote_id))
         .leftJoin(product, eq(webQuote.product_id, product.id))
-        .leftJoin(zone,eq(zone.id,webQuote.zone_id))
-        .groupBy(webQuote.id,product.product_url,zone.zone_name);
+        .leftJoin(zone, eq(zone.id, webQuote.zone_id))
+        .groupBy(webQuote.id, product.product_url, zone.zone_name);
 
       // web_quote
       let countQuery = dbInstance.select({ total: count() }).from(webQuote);
@@ -393,6 +397,41 @@ export class webQuoteService {
       });
     } catch (error) {
       console.error("Error creating quote accessories:", error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal Server Error." });
+    }
+  }
+  static async firstPageForm(req, res) {
+    try {      
+      const sfService = new SalesForceService();    
+      if((!req.body.fName)||(!req.body.lName)||(!req.body.company)||(!req.body.phNo)||(!req.body.email)||(!req.body.jobTitle)||(!req.body.state)||(!req.body.industry)){
+        return res.status(403).json({success:false,message:"All fields are required!"})
+      }
+ 
+      const data = {
+        Name: req.body.fName||"--",
+        Last_Name__c: req.body.lName||"--",
+        Company__c: req.body.company||"--",
+        Phone_Number__c: req.body.phNo||"--",
+        Email__c: req.body.email||"noemail@given.com",
+        Job_Title__c: req.body.jobTitle||"--",
+        State__c: req.body.state||"--",
+        Industry__c: req.body.industry||"--",
+      };
+      const searchCondition={
+        Phone_Number__c: req.body.phNo||"--",
+        Email__c: req.body.email||"noemail@given.com", 
+        State__c: req.body.state||"--", 
+      }
+      const exitsingRecord=await sfService.jsForceFindOne("FirstPageForm__c",searchCondition)
+      if(exitsingRecord){
+        return res.status(403).json({message:"Duplicate Entry!"})
+      }
+      await sfService.jsForceCreateOneRecordInObj("FirstPageForm__c",data)
+      return res.status(201).json({ success:true,message: "Lead Created" });
+    } catch (error) {
+      console.log(error);
       return res
         .status(500)
         .json({ success: false, error: "Internal Server Error." });
