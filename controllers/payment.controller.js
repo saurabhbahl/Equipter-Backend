@@ -13,6 +13,7 @@ import { dbInstance } from "../config/dbConnection.cjs";
 import { eq } from "drizzle-orm";
 import { capitalize } from "../utils/helpers.js";
 import { JWT_SECRET } from "../useENV.js";
+import { SalesForceService } from "../services/salesForceService.js";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-12-18.acacia",
 });
@@ -111,7 +112,6 @@ export class paymentService {
           message: "Order not found.",
         });
       }
-      console.log("webQuoteRes:", webQuoteRes);
       const productImages = await dbInstance
         .select()
         .from(productImage)
@@ -150,7 +150,7 @@ export class paymentService {
         .from(quoteAccessory)
         .where(eq(quoteAccessory.webquote_id, webQuoteId))
         .leftJoin(accessory, eq(accessory.id, quoteAccessory.accessory_id));
-      console.log("accessories", accessories);
+ 
 
       // Calculate total price (product + accessories)
       let totalPrice =
@@ -228,7 +228,6 @@ export class paymentService {
       if (customers.data.length > 0) {
         // Customer exists
         customer = customers.data[0];
-        console.log("sCus", customer);
       } else {
         // Customer does not exist, create a new one
         customer = await stripe.customers.create({
@@ -244,7 +243,7 @@ export class paymentService {
           },
         });
       }
-      console.log("Cus", customer);
+
 
       // const coupon = await stripe.coupons.create({
       //   name: `Non Refundable Deposit (20% of ${deposit})`,
@@ -308,35 +307,56 @@ export class paymentService {
         console.log(`Unhandled event type ${event.type}`);
     }
 
-    // Return a response to acknowledge receipt of the event
-    res.json({ received: true });
+    // response to acknowledge receipt of the event
+    // res.json({  });
+    res.status(200).json({success:true,message:"Order created successfully!",received: true})
   }
   static async fulfillOrder(session) {
     try {
-      console.log(session);
+      // get webquote id
       const webQuoteId = session.metadata.webQuoteId;
       if (!webQuoteId) {
         console.error("No webQuoteId found in session metadata.");
         return;
       }
-      await dbInstance
+      
+    // update webquote stage
+    const [webQuoteRes]=  await dbInstance
         .update(webQuote)
         .set({ stage: "Ordered" })
-        .where(eq(webQuote.id, webQuoteId));
+        .where(eq(webQuote.id, webQuoteId)).returning()
+      
+ 
+      
+      
+      // create salesforce order
+      const sfService=new SalesForceService();
+      const sfOrderData={
+        Order_Status__c:"Pending",
+        Web_Quote_Id__c:webQuoteRes?.sfIdRef,
+        Name:webQuoteRes.product_name
+      }
+      const orderRes=await sfService.jsForceCreateOneRecordInObj("Product_Order__c",sfOrderData)
+      
 
+      
       // Calculate 3 months from now
       const estimatedCompletion = new Date();
       estimatedCompletion.setMonth(estimatedCompletion.getMonth() + 3);
+      
       const [newOrder] = await dbInstance
         .insert(order)
         .values({
+          sfIdRef:orderRes.id,
           webquote_id: webQuoteId,
           order_status: "Pending",
           estimated_completion_date: estimatedCompletion,
         })
         .returning();
+      
 
       console.log(`Order ${webQuoteId} has been fulfilled.`, newOrder);
+  
     } catch (err) {
       console.error("Order fulfillment failed:", err);
       throw err;

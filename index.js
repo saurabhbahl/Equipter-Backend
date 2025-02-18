@@ -24,13 +24,16 @@ import stateRouter from "./routes/state.routes.js";
 import paymentRouter from "./routes/payment.routes.js";
 import { paymentService } from "./controllers/payment.controller.js";
 import salesForceHooksRouter from "./routes/salesForceHooks.routes.js";
+import { SalesForceService } from "./services/salesForceService.js";
+import memoryCache from "memory-cache";
+import { getSFAccessToken } from "./utils/sFTokenManagement.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 
 // Logging
-app.use(morgan("combined"));
+app.use(morgan("common"));
 
 // CORS configuration
 const allowedOrigins =
@@ -40,7 +43,6 @@ const allowedOrigins =
         "http://localhost:4173",
         "http://localhost:5173",
         "http://192.168.152.1:5173",
-        "https://equipter-frontend.vercel.app"
       ];
 app.use(
   cors({
@@ -49,7 +51,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
 );
-// app.use(helmet())
+
 // Helmet configuration
 app.use(
   helmet({
@@ -92,11 +94,14 @@ if (process.env.NODE_ENV === "production") {
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
 
+// ip logger
 app.use((req, res, next) => {
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
   console.log(`IP address of incoming request: ${ip}`);
   next();
 });
+
+const sfService=new SalesForceService();
 
   
 app.post("/api/v1/payment/webhook", express.raw({ type: 'application/json' }), paymentService.handleWebhook);
@@ -118,7 +123,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/payment", paymentRouter);
 
-app.get("/api/test", (req, res) => {
+app.get("/api/test", async(req, res) => {
   res.json({ message: "👍✅" });
 });
 

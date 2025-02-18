@@ -25,7 +25,7 @@ export async function verifyToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET, {
       algorithms: "HS256",
     });
-    console.log("Decoded Payload:", decoded);
+    console.log("Decoded Payload:", decoded.role);
     const userExists = await dbInstance
       .select()
       .from(users)
@@ -53,7 +53,7 @@ export const checkAdminRole = (req, res, next) => {
     }
     next();
   } catch (error) {
-    console.log(error);
+    console.error(error);
     if (error instanceof jwt.TokenExpiredError) {
       return res.status(401).json({
         success: false,

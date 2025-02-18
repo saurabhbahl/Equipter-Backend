@@ -18,22 +18,6 @@ export class SalesForceService {
       instanceUrl: this.instanceUrl,
     });
   }
-  static async preCallService(){
-
-      try {
-        const service=new SalesForceService()
-        const token = await getSFAccessToken();
-        this.sfAccessToken = token;
-        // this.jsForceConnectionInstance.accessToken = token
-        // this.jsForceConnectionInstance.instanceUrl = this.instanceUrl
-        console.log("Salesforce service initialized successfully.");
-        return service
-      } catch (error) {
-        console.error("Failed to initialize Salesforce service:", error);
-        throw error; 
-      }
-
-  }
   
   async initializeService() {
     try {
@@ -168,6 +152,7 @@ export class SalesForceService {
 
   
   // js force utils
+  // get single record
   async jsForceFindOne(objectName, searchCondition) {
     try {
       const existingRecord = await this.jsForceConnectionInstance
@@ -186,13 +171,32 @@ export class SalesForceService {
       throw error;
     }
   }
-
+  // create
   async jsForceCreateOneRecordInObj(objectName, data) {
     try {
       const createdRecord = await this.jsForceConnectionInstance
         .sobject(objectName)
         .create(data);
       return createdRecord;
+    } catch (error) {
+      console.log(error);
+      if (error.errorCode === "INVALID_SESSION_ID") {
+        console.log("Session invalid or expired. Fetching new token...");
+        await this.refreshToken(); 
+        return await this.jsForceConnectionInstance
+        .sobject(objectName)
+        .create(data);
+      }
+      throw error;
+    }
+  }
+  // update
+  async jsForceUpdateOneRecordInObj(objectName, data) {
+    try {
+      const updatedRecord = await this.jsForceConnectionInstance
+        .sobject(objectName)
+        .update(data);
+      return updatedRecord;
     } catch (error) {
       console.log(error);
       if (error.errorCode === "INVALID_SESSION_ID") {

@@ -1,12 +1,9 @@
 import { count, eq, and, gte, like, sql, desc } from "drizzle-orm";
 import { dbInstance } from "../config/dbConnection.cjs";
-import { product, quoteAccessory, webQuote, zone } from "../models/tables.js";
+import { product, quoteAccessory, state, webQuote, zone, zoneState } from "../models/tables.js";
 import { z } from "zod";
 import { getDetailedErrors } from "../utils/validationUtil.js";
-import {
-  MAILER_EMAIL,
-  MAILER_PASSWORD,
-} from "../useENV.js";
+import { FRONTEND_URL, MAILER_EMAIL, MAILER_PASSWORD } from "../useENV.js";
 import memoryCache from "memory-cache";
 import nodemailer from "nodemailer";
 import { SalesForceService } from "../services/salesForceService.js";
@@ -40,7 +37,7 @@ export class webQuoteService {
       }
       if (dateFilter) {
         const days = parseInt(dateFilter, 10);
-        console.log(days);
+
         if (!isNaN(days) && days > 0) {
           const dateThreshold = new Date();
           dateThreshold.setDate(dateThreshold.getDate() - days);
@@ -136,7 +133,7 @@ export class webQuoteService {
       }
 
       // 2)  form data
-      const formData = { ...req.body.checkoutForm, stage: "Quote" };
+      const formData = { ...req.body.checkoutForm, stage: "Quote",payment_type:'Card' };
 
       // 3) Convert empty string to null
       if (formData.zone_id === "") {
@@ -175,7 +172,82 @@ export class webQuoteService {
         quoteAccessoryRes = await Promise.all(accessoryPromises);
       }
 
-      // 7) Return both the main quote and the newly inserted accessories
+
+      /**7) Sync data with the salesforce */
+      const sfService=new SalesForceService();
+      const productRes = await dbInstance
+        .select()
+        .from(product)
+        .where(eq(product.id, formData.product_id));
+        
+        const deliveryStateRes = await dbInstance
+        .select()
+        .from(state)
+        .where(eq(state.id, createdQuote.delivery_address_state_id));
+
+      // Fetch billing state information
+      const billingStateRes = await dbInstance
+        .select()
+        .from(state)
+        .where(eq(state.id, createdQuote.billing_address_state));
+
+      const stateRes = {
+        deliveryState: deliveryStateRes[0] || null,
+        billingState: billingStateRes[0] || null,
+      };
+      
+      const [zoneRes] = await dbInstance
+      .select()
+      .from(zoneState)
+      .leftJoin(zone, eq(zone.id, zoneState.zone_id))
+      .where(eq(zoneState.state_id, createdQuote.delivery_address_state_id));
+      
+      console.log(zoneRes)
+      
+      const webQuoteurl = `${FRONTEND_URL}products/${productRes[0].product_url}?webQuote=${createdQuote.id}`;
+      const sfData = {
+        payment_type__c: createdQuote.payment_type,
+        contact_job_title__c: createdQuote.contact_job_title,
+        contact_industry__c: createdQuote.contact_industry,
+        contact_email__c: createdQuote.contact_email,
+        contact_phone_number__c: createdQuote.contact_phone_number,
+        contact_company_name__c: createdQuote.contact_company_name,
+        contact_first_name__c: createdQuote.contact_first_name,
+        contact_last_name__c: createdQuote.contact_last_name,
+        billing_address_country__c: createdQuote.billing_address_country,
+        billing_address_zip_code__c:createdQuote.billing_address_zip_code,
+        billing_address_state__c: stateRes?.billingState.state_name,
+        billing_address_city__c: createdQuote?.billing_address_city,
+        delivery_address_country__c: "United States",
+        delivery_address_zip_code__c: createdQuote?.delivery_address_zip_code,
+        delivery_address_state__c: stateRes?.deliveryState.state_name,
+        delivery_address_city__c: createdQuote?.delivery_address_city,
+        delivery_cost__c: zoneRes?.zone?.shipping_rate ||"",
+        shipping_method_used__c: createdQuote.shipping_method_used,
+        product_qty__c: createdQuote.product_qty,
+        product_price__c:createdQuote.product_price,
+        product_name__c: createdQuote.product_name,
+        billing_address_street__c: createdQuote.billing_address_street,
+        delivery_address_street__c: createdQuote.contact_first_name,
+        financing__c: createdQuote.financing,
+        stage__c: createdQuote.stage,
+        webquote_url__c: webQuoteurl,       
+        name:createdQuote.product_name,     
+      };
+      const sfWebQuoteRes=await sfService.jsForceCreateOneRecordInObj("Web_Quote__c",sfData)
+      // update the webquote
+      if(sfWebQuoteRes.success){
+         await dbInstance
+        .update(webQuote)
+        .set({
+          sfIdRef:sfWebQuoteRes.id,
+          delivery_cost:zoneRes.zone.shipping_rate
+        })
+        .where(eq(webQuote.id, createdQuote.id))
+        .returning();
+      }
+
+      // 8) Return both the main quote and the newly inserted accessories
       return res.status(201).json({
         success: true,
         message: "WebQuoate created successfully!",
@@ -200,7 +272,6 @@ export class webQuoteService {
         .where(eq(webQuote.id, id))
         .returning();
 
-      console.log(webQuoteRes);
       return res.status(200).json({ success: true, data: webQuoteRes });
     } catch (error) {
       console.error(error);
@@ -228,7 +299,7 @@ export class webQuoteService {
         .where(eq(webQuote.id, id))
         .returning();
 
-      console.log(webQuoteRes);
+
       return res.status(200).json({ success: true, data: webQuoteRes });
     } catch (error) {
       console.error(error);
@@ -333,13 +404,13 @@ export class webQuoteService {
           .status(400)
           .json({ success: false, message: "No data provided." });
       }
-      console.log(data);
+
 
       // Determine if the incoming data is an array or a single object
       const isArray = Array.isArray(data);
       const accessories = isArray ? data : [data];
 
-      // Validate each accessory object
+      // Validate each accessory objectinsertValues=>
       for (const accessory of accessories) {
         const {
           webquote_id,
@@ -384,7 +455,7 @@ export class webQuoteService {
         unit_price: parseFloat(acc.unit_price),
         total_price: parseFloat(acc.total_price),
       }));
-      console.log("insertValues=>", insertValues);
+   
 
       const createdAccessories = await dbInstance
         .insert(quoteAccessory)
@@ -403,35 +474,49 @@ export class webQuoteService {
     }
   }
   static async firstPageForm(req, res) {
-    try {      
-      const sfService = new SalesForceService();    
-      if((!req.body.fName)||(!req.body.lName)||(!req.body.company)||(!req.body.phNo)||(!req.body.email)||(!req.body.jobTitle)||(!req.body.state)||(!req.body.industry)){
-        return res.status(403).json({success:false,message:"All fields are required!"})
+    try {
+      const sfService = new SalesForceService();
+      if (
+        !req.body.fName ||
+        !req.body.lName ||
+        !req.body.company ||
+        !req.body.phNo ||
+        !req.body.email ||
+        !req.body.jobTitle ||
+        !req.body.state ||
+        !req.body.industry
+      ) {
+        return res
+          .status(403)
+          .json({ success: false, message: "All fields are required!" });
       }
- 
+
       const data = {
-        Name: req.body.fName||"--",
-        Last_Name__c: req.body.lName||"--",
-        Company__c: req.body.company||"--",
-        Phone_Number__c: req.body.phNo||"--",
-        Email__c: req.body.email||"noemail@given.com",
-        Job_Title__c: req.body.jobTitle||"--",
-        State__c: req.body.state||"--",
-        Industry__c: req.body.industry||"--",
+        Name: req.body.fName || "--",
+        Last_Name__c: req.body.lName || "--",
+        Company__c: req.body.company || "--",
+        Phone_Number__c: req.body.phNo || "--",
+        Email__c: req.body.email || "noemail@given.com",
+        Job_Title__c: req.body.jobTitle || "--",
+        State__c: req.body.state || "--",
+        Industry__c: req.body.industry || "--",
       };
-      const searchCondition={
-        Phone_Number__c: req.body.phNo||"--",
-        Email__c: req.body.email||"noemail@given.com", 
-        State__c: req.body.state||"--", 
+      const searchCondition = {
+        Phone_Number__c: req.body.phNo || "--",
+        Email__c: req.body.email || "noemail@given.com",
+        State__c: req.body.state || "--",
+      };
+      const exitsingRecord = await sfService.jsForceFindOne(
+        "FirstPageForm__c",
+        searchCondition
+      );
+      if (exitsingRecord) {
+        return res.status(403).json({ message: "Duplicate Entry!" });
       }
-      const exitsingRecord=await sfService.jsForceFindOne("FirstPageForm__c",searchCondition)
-      if(exitsingRecord){
-        return res.status(403).json({message:"Duplicate Entry!"})
-      }
-      await sfService.jsForceCreateOneRecordInObj("FirstPageForm__c",data)
-      return res.status(201).json({ success:true,message: "Lead Created" });
+      await sfService.jsForceCreateOneRecordInObj("FirstPageForm__c", data);
+      return res.status(201).json({ success: true, message: "Lead Created" });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res
         .status(500)
         .json({ success: false, error: "Internal Server Error." });

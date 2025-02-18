@@ -239,13 +239,16 @@ export const emiTransaction = pgTable("emi_transaction", {
 //16
 export const order = pgTable("order", {
   id: uuid("id").primaryKey().defaultRandom(),
+  sfIdRef: text("sfIdRef").default("not-given"),
   order_status: orderStatus("order_status").notNull(),
   webquote_id: uuid("webquote_id").references(() => webQuote.id,{onDelete:"set null",onUpdate:"set null"}),
   estimated_completion_date: timestamp("estimated_completion_date").notNull(),
   actual_completion_date: timestamp("actual_completion_date"),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
-});
+},(order)=>[
+  index("order_sfIdRef_index").on(order.sfIdRef)
+]);
 
 //17
 export const developmentStage = pgTable("development_stage", {
