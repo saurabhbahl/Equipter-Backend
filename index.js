@@ -5,6 +5,7 @@ import morgan from "morgan";
 import helmet from "helmet";
 import hpp from "hpp";
 
+
 // connection
 import { connection } from "./config/dbConnection.cjs";
 
@@ -25,15 +26,13 @@ import paymentRouter from "./routes/payment.routes.js";
 import { paymentService } from "./controllers/payment.controller.js";
 import salesForceHooksRouter from "./routes/salesForceHooks.routes.js";
 import { SalesForceService } from "./services/salesForceService.js";
-import memoryCache from "memory-cache";
-import { getSFAccessToken } from "./utils/sFTokenManagement.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 
 // Logging
-app.use(morgan("common"));
+// app.use(morgan("common"));
 
 // CORS configuration
 const allowedOrigins =
@@ -102,6 +101,7 @@ app.use((req, res, next) => {
 });
 
 const sfService=new SalesForceService();
+
 
   
 app.post("/api/v1/payment/webhook", express.raw({ type: 'application/json' }), paymentService.handleWebhook);

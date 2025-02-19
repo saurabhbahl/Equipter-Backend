@@ -35,7 +35,7 @@ export class paymentService {
         currency,
         payment_method: paymentMethodId,
         confirm: true,
-        return_url: "https://your-frontend-url.com/return",
+        return_url: "https://frontend-url.com/return",
         receipt_email: "excitingishizaka@fearlessmails.com",
       });
 
@@ -319,18 +319,22 @@ export class paymentService {
         console.error("No webQuoteId found in session metadata.");
         return;
       }
-      
+          const sfService=new SalesForceService();
     // update webquote stage
     const [webQuoteRes]=  await dbInstance
         .update(webQuote)
         .set({ stage: "Ordered" })
         .where(eq(webQuote.id, webQuoteId)).returning()
       
- 
-      
-      
+//  update sf webquote stage
+      const sfWebQuoteData={
+        Id:webQuoteRes.sfIdRef,
+        Stage__c:"Ordered"
+      }
+      const sfWebQuoteRes=await sfService.jsForceUpdateOneRecordInObj("Web_Quote__c",sfWebQuoteData)
+      console.log(sfWebQuoteRes)
       // create salesforce order
-      const sfService=new SalesForceService();
+  
       const sfOrderData={
         Order_Status__c:"Pending",
         Web_Quote_Id__c:webQuoteRes?.sfIdRef,
